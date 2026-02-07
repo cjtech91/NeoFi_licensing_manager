@@ -6,6 +6,7 @@ import {
   Ticket, 
   Wifi, 
   BarChart3, 
+  Key,
   LogOut, 
   Menu,
   X

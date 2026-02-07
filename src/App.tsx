@@ -7,6 +7,7 @@ import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import Vouchers from './pages/Vouchers';
 import Machines from './pages/Machines';
+import Licenses from './pages/Licenses';
 import Reports from './pages/Reports';
 import Layout from './components/Layout';
 
