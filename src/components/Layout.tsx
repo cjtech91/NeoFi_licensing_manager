@@ -26,6 +26,7 @@ export default function Layout() {
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Vouchers', href: '/vouchers', icon: Ticket },
     { name: 'Machines', href: '/machines', icon: Wifi },
+    { name: 'Licenses', href: '/licenses', icon: Key },
     { name: 'Reports', href: '/reports', icon: BarChart3 },
   ];
 

@@ -46,6 +46,7 @@ function App() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="vouchers" element={<Vouchers />} />
             <Route path="machines" element={<Machines />} />
+            <Route path="licenses" element={<Licenses />} />
             <Route path="reports" element={<Reports />} />
           </Route>
         </Routes>
