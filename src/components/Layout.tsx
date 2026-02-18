@@ -37,7 +37,7 @@ export default function Layout() {
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2 font-bold text-xl text-blue-600">
           <Wifi className="h-6 w-6" />
-          <span>Piso Wifi</span>
+          <span>NeoFi</span>
         </div>
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -56,7 +56,7 @@ export default function Layout() {
         <div className="h-full flex flex-col">
           <div className="h-16 flex items-center px-6 border-b">
             <Wifi className="h-8 w-8 text-blue-600 mr-2" />
-            <span className="text-xl font-bold text-gray-900">Piso Wifi</span>
+            <span className="text-xl font-bold text-gray-900">NeoFi</span>
           </div>
 
           <div className="flex-1 overflow-y-auto py-4">
