@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Wifi, Shield, Activity, Settings } from 'lucide-react';
+import { Shield, Activity, Settings } from 'lucide-react';
 
 export default function Home() {
   return (
@@ -58,7 +58,7 @@ export default function Home() {
         <div className="lg:absolute lg:inset-y-0 lg:right-0 lg:w-1/2 bg-gray-50 flex items-center justify-center">
           {/* Abstract Pattern or Image Placeholder */}
           <div className="p-12">
-            <Wifi className="h-64 w-64 text-blue-100" />
+            <img src="/Screenshot.png" alt="NeoFi" className="max-h-[420px] w-auto rounded-lg shadow-sm" />
           </div>
         </div>
       </div>
