@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/neologo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NoeFi Systems</title>
+    <title>NeoFi Systems</title>
     <script type="module">
       if (import.meta.hot?.on) {
         import.meta.hot.on('vite:error', (error) => {
@@ -20,5 +20,25 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      const __hideTrae = () => {
+        const nodes = document.querySelectorAll('body *');
+        for (const node of nodes) {
+          const t = (node.textContent || '').trim();
+          if (t === 'TRAE SOLO') {
+            const c = node.closest('*');
+            if (c && c instanceof HTMLElement) {
+              c.style.display = 'none';
+            }
+          }
+        }
+      };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', __hideTrae);
+      } else {
+        __hideTrae();
+      }
+      new MutationObserver(__hideTrae).observe(document.documentElement, { childList: true, subtree: true });
+    </script>
   </body>
 </html>
