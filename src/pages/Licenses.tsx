@@ -80,11 +80,22 @@ export default function Licenses() {
       setShowModal(false);
     } catch (error: unknown) {
       console.error('Error generating license:', error);
+      let errorMessage = 'Unknown error';
       if (error instanceof Error) {
-        alert(`Failed to generate license: ${error.message}`);
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null && 'message' in error) {
+        errorMessage = (error as any).message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
       } else {
-        alert('Failed to generate license: Unknown error');
+         // Fallback for completely unknown errors
+         try {
+            errorMessage = JSON.stringify(error);
+         } catch {
+            errorMessage = 'Unknown error object';
+         }
       }
+      alert(`Failed to generate license: ${errorMessage}`);
     } finally {
       setGenerating(false);
     }
