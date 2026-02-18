@@ -95,6 +95,52 @@ export default function Licenses() {
             errorMessage = 'Unknown error object';
          }
       }
+
+      // Check for foreign key violation (missing user in public.users)
+      if (errorMessage.includes('licenses_created_by_fkey') || 
+          (typeof error === 'object' && error !== null && 'code' in error && (error as any).code === '23503')) {
+        
+        try {
+          // Attempt to self-heal: create the missing user record
+          const { error: healError } = await (supabase.from('users') as any).insert({
+            id: session?.user.id,
+            email: session?.user.email,
+            role: 'operator',
+            // @ts-ignore - password_hash is required by DB but not in types yet if we didn't update them fully, 
+            // or if we are using the types from the file we patched earlier.
+            // Actually, we did update types, but let's check if we need to cast.
+            // We'll just pass it.
+            password_hash: 'managed_by_supabase_auth' 
+          });
+
+          if (!healError) {
+             // Retry generation once
+             const retryKey = generateLicenseKey();
+             const { data: retryData, error: retryError } = await (supabase
+                .from('licenses') as any)
+                .insert([
+                  {
+                    key: retryKey,
+                    type: newLicenseType,
+                    status: 'active',
+                    created_by: session?.user.id
+                  }
+                ])
+                .select()
+                .single();
+              
+              if (!retryError) {
+                setLicenses([retryData, ...licenses]);
+                setShowModal(false);
+                alert('License generated successfully! (User account link was fixed automatically)');
+                return;
+              }
+          }
+        } catch (e) {
+          console.error('Self-healing failed:', e);
+        }
+      }
+
       alert(`Failed to generate license: ${errorMessage}`);
     } finally {
       setGenerating(false);
