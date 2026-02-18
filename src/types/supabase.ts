@@ -99,6 +99,44 @@ export interface Database {
           created_at?: string
         }
       }
+      licenses: {
+        Row: {
+          id: string
+          key: string
+          status: 'active' | 'used' | 'revoked'
+          type: 'lifetime' | 'subscription' | 'trial'
+          machine_id: string | null
+          hardware_id: string | null
+          created_by: string | null
+          activated_at: string | null
+          expires_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          key: string
+          status?: 'active' | 'used' | 'revoked'
+          type?: 'lifetime' | 'subscription' | 'trial'
+          machine_id?: string | null
+          hardware_id?: string | null
+          created_by?: string | null
+          activated_at?: string | null
+          expires_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          key?: string
+          status?: 'active' | 'used' | 'revoked'
+          type?: 'lifetime' | 'subscription' | 'trial'
+          machine_id?: string | null
+          hardware_id?: string | null
+          created_by?: string | null
+          activated_at?: string | null
+          expires_at?: string | null
+          created_at?: string
+        }
+      }
       sales: {
         Row: {
           id: string

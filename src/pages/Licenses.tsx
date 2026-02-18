@@ -61,8 +61,8 @@ export default function Licenses() {
       setGenerating(true);
       const key = generateLicenseKey();
       
-      const { data, error } = await supabase
-        .from('licenses')
+      const { data, error } = await (supabase
+        .from('licenses') as any)
         .insert([
           {
             key,
