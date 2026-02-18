@@ -78,9 +78,13 @@ export default function Licenses() {
 
       setLicenses([data, ...licenses]);
       setShowModal(false);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error generating license:', error);
-      alert('Failed to generate license');
+      if (error instanceof Error) {
+        alert(`Failed to generate license: ${error.message}`);
+      } else {
+        alert('Failed to generate license: Unknown error');
+      }
     } finally {
       setGenerating(false);
     }
