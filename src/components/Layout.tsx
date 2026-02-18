@@ -109,8 +109,8 @@ export default function Layout() {
       </div>
 
       {/* Main content */}
-      <div className="lg:pl-64 flex flex-col min-h-screen pt-12 lg:pt-0">
-        <main className="flex-1 pt-2 pb-8 px-4 sm:px-6 lg:px-8">
+      <div className="lg:pl-64 flex flex-col min-h-screen pt-0 lg:pt-0">
+        <main className="flex-1 pt-0 pb-8 px-4 sm:px-6 lg:px-8">
           <Outlet />
         </main>
       </div>
