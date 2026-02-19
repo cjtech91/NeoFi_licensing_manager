@@ -59,6 +59,10 @@ export default function Licenses() {
   const handleGenerateLicense = async () => {
     try {
       setGenerating(true);
+      if (!session?.user?.id) {
+        alert('Please sign in to generate a license.');
+        return;
+      }
       const key = generateLicenseKey();
       
       const { data, error } = await (supabase
