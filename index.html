@@ -4,7 +4,8 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/neologo.png" />
     <style>
-      [id*="trae"], [class*="trae"], [aria-label*="Trae"], [aria-label*="TRAE"], [title*="Trae"], [title*="TRAE"] { display: none !important; }
+      /* Only target the specific bottom-right badge text to avoid affecting app UI */
+      .hide-trae-badge { display: none !important; }
     </style>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NeoFi Systems</title>
@@ -25,37 +26,30 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       (function() {
-        function hide() {
-          var nodes = Array.prototype.slice.call(document.querySelectorAll('*'));
-          for (var i = 0; i < nodes.length; i++) {
-            var el = nodes[i];
-            var t = (el.textContent || '');
-            if (t.indexOf('TRAE SOLO') !== -1 || t.toUpperCase().indexOf('TRAE') !== -1) {
-              var p = el.closest('*');
-              if (p && p.style) p.style.display = 'none';
-            }
-            var s = window.getComputedStyle(el);
-            var right = parseInt(s.right || '0', 10);
-            var bottom = parseInt(s.bottom || '0', 10);
-            if (s.position === 'fixed' && right <= 60 && bottom <= 60 && t.toUpperCase().indexOf('TRAE') !== -1) {
-              el.style.display = 'none';
-            }
-          }
-          var qs = ['*[id*="trae"]','*[class*="trae"]','*[aria-label*="trae"]','*[title*="trae"]'];
-          for (var q = 0; q < qs.length; q++) {
-            var list = document.querySelectorAll(qs[q]);
-            for (var j = 0; j < list.length; j++) {
-              var e = list[j];
-              if (e && e.style) e.style.display = 'none';
+        function isTraeBadge(el) {
+          try {
+            var text = (el.textContent || '').trim();
+            var rect = el.getBoundingClientRect();
+            var isBottomRight = rect && (window.innerWidth - rect.right < 120) && (window.innerHeight - rect.bottom < 120);
+            return text === 'TRAE SOLO' && isBottomRight;
+          } catch (_) { return false; }
+        }
+        function hideTraeBadge() {
+          var all = document.querySelectorAll('body *');
+          for (var i = 0; i < all.length; i++) {
+            var el = all[i];
+            if (isTraeBadge(el)) {
+              var container = el.closest('*');
+              if (container && container.classList) container.classList.add('hide-trae-badge');
             }
           }
         }
         if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', hide);
+          document.addEventListener('DOMContentLoaded', hideTraeBadge);
         } else {
-          hide();
+          hideTraeBadge();
         }
-        new MutationObserver(hide).observe(document.documentElement, { childList: true, subtree: true });
+        new MutationObserver(hideTraeBadge).observe(document.body, { childList: true, subtree: true });
       })();
     </script>
   </body>
