@@ -9,6 +9,7 @@ interface License {
   status: 'active' | 'used' | 'revoked';
   type: 'lifetime' | 'subscription' | 'trial';
   hardware_id: string | null;
+  machine_id: string | null;
   created_at: string;
   activated_at: string | null;
 }
@@ -304,45 +305,39 @@ export default function Licenses() {
                   <li key={license.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-3 mb-2">
                           <p className="text-sm font-medium text-blue-600 truncate font-mono">
                             {license.key}
                           </p>
-                          <button
-                            onClick={() => copyToClipboard(license.key)}
-                            className="text-gray-400 hover:text-gray-600 transition-colors"
-                            title="Copy to clipboard"
-                          >
-                            {copySuccess === license.key ? (
-                              <Check className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
-                          </button>
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            license.status === 'active' ? 'bg-green-100 text-green-800' :
-                            license.status === 'used' ? 'bg-blue-100 text-blue-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                             {license.status}
                           </span>
                           <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
                             {license.type}
                           </span>
                         </div>
-                        <div className="mt-2 flex">
-                          <div className="flex items-center text-sm text-gray-500">
-                            <span className="truncate">
-                              {license.hardware_id ? `Bound to: ${license.hardware_id}` : 'Not activated yet'}
+                        <div className="mt-2 text-sm text-gray-500">
+                          <p className="flex items-center">
+                            <span className="font-medium mr-2">Hardware ID:</span>
+                            <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">
+                              {license.hardware_id || 'N/A'}
+                            </code>
+                          </p>
+                          <p className="mt-1 flex items-center">
+                            <span className="font-medium mr-2">Activated:</span>
+                            <span>
+                              {license.activated_at 
+                                ? new Date(license.activated_at).toLocaleString() 
+                                : 'N/A'}
                             </span>
-                          </div>
+                          </p>
                         </div>
                       </div>
                       <div className="flex flex-col items-end text-sm text-gray-500">
                         <span>Created: {new Date(license.created_at).toLocaleDateString()}</span>
-                        {license.activated_at && (
-                          <span className="text-xs text-gray-400">
-                            Activated: {new Date(license.activated_at).toLocaleDateString()}
+                        {license.machine_id && (
+                          <span className="text-xs text-gray-400 mt-1">
+                            Machine ID: {license.machine_id}
                           </span>
                         )}
                       </div>
