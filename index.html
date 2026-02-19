@@ -30,7 +30,7 @@
           try {
             var text = (el.textContent || '').trim();
             var rect = el.getBoundingClientRect();
-            var isBottomRight = rect && (window.innerWidth - rect.right < 120) && (window.innerHeight - rect.bottom < 120);
+            var isBottomRight = rect && (window.innerWidth - rect.right < 180) && (window.innerHeight - rect.bottom < 180);
             return text === 'TRAE SOLO' && isBottomRight;
           } catch (_) { return false; }
         }
@@ -43,13 +43,33 @@
               if (container && container.classList) container.classList.add('hide-trae-badge');
             }
           }
+          // Also hide iframes anchored at bottom-right that may contain the badge
+          var iframes = document.querySelectorAll('iframe');
+          for (var k = 0; k < iframes.length; k++) {
+            var f = iframes[k];
+            try {
+              var r = f.getBoundingClientRect();
+              var isBR = r && (window.innerWidth - r.right < 180) && (window.innerHeight - r.bottom < 180);
+              var z = window.getComputedStyle(f).zIndex;
+              if (isBR && parseInt(z || '0', 10) >= 1) {
+                f.style.display = 'none';
+              }
+            } catch (_) {}
+          }
         }
         if (document.readyState === 'loading') {
           document.addEventListener('DOMContentLoaded', hideTraeBadge);
         } else {
           hideTraeBadge();
         }
-        new MutationObserver(hideTraeBadge).observe(document.body, { childList: true, subtree: true });
+        new MutationObserver(hideTraeBadge).observe(document.documentElement, { childList: true, subtree: true });
+        // Ensure late injections are caught
+        var attempts = 0;
+        var timer = setInterval(function() {
+          hideTraeBadge();
+          attempts++;
+          if (attempts > 40) clearInterval(timer);
+        }, 250);
       })();
     </script>
   </body>
