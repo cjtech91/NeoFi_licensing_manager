@@ -216,73 +216,144 @@ export default function Licenses() {
         </div>
       </div>
 
-      {/* Licenses Table */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">License Keys</h3>
-        </div>
-        {loading ? (
+      {/* Licenses Tables */}
+      {loading ? (
+        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
           <div className="p-12 flex justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
           </div>
-        ) : licenses.length === 0 ? (
-          <div className="p-12 text-center text-gray-500">
-            No licenses found. Generate one to get started.
-          </div>
-        ) : (
-          <ul className="divide-y divide-gray-200">
-            {licenses.map((license) => (
-              <li key={license.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-3">
-                      <p className="text-sm font-medium text-blue-600 truncate font-mono">
-                        {license.key}
-                      </p>
-                      <button
-                        onClick={() => copyToClipboard(license.key)}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                        title="Copy to clipboard"
-                      >
-                        {copySuccess === license.key ? (
-                          <Check className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {/* Available Licenses */}
+          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+            <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
+              <h3 className="text-lg leading-6 font-medium text-gray-900">Available Licenses</h3>
+            </div>
+            {licenses.filter(l => l.status === 'active').length === 0 ? (
+              <div className="p-12 text-center text-gray-500">
+                No available licenses found. Generate one to get started.
+              </div>
+            ) : (
+              <ul className="divide-y divide-gray-200">
+                {licenses.filter(l => l.status === 'active').map((license) => (
+                  <li key={license.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-3">
+                          <p className="text-sm font-medium text-blue-600 truncate font-mono">
+                            {license.key}
+                          </p>
+                          <button
+                            onClick={() => copyToClipboard(license.key)}
+                            className="text-gray-400 hover:text-gray-600 transition-colors"
+                            title="Copy to clipboard"
+                          >
+                            {copySuccess === license.key ? (
+                              <Check className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </button>
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            license.status === 'active' ? 'bg-green-100 text-green-800' :
+                            license.status === 'used' ? 'bg-blue-100 text-blue-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {license.status}
+                          </span>
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                            {license.type}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex">
+                          <div className="flex items-center text-sm text-gray-500">
+                            <span className="truncate">
+                              {license.hardware_id ? `Bound to: ${license.hardware_id}` : 'Not activated yet'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end text-sm text-gray-500">
+                        <span>Created: {new Date(license.created_at).toLocaleDateString()}</span>
+                        {license.activated_at && (
+                          <span className="text-xs text-gray-400">
+                            Activated: {new Date(license.activated_at).toLocaleDateString()}
+                          </span>
                         )}
-                      </button>
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        license.status === 'active' ? 'bg-green-100 text-green-800' :
-                        license.status === 'used' ? 'bg-blue-100 text-blue-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {license.status}
-                      </span>
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                        {license.type}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex">
-                      <div className="flex items-center text-sm text-gray-500">
-                        <span className="truncate">
-                          {license.hardware_id ? `Bound to: ${license.hardware_id}` : 'Not activated yet'}
-                        </span>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex flex-col items-end text-sm text-gray-500">
-                    <span>Created: {new Date(license.created_at).toLocaleDateString()}</span>
-                    {license.activated_at && (
-                      <span className="text-xs text-gray-400">
-                        Activated: {new Date(license.activated_at).toLocaleDateString()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Used Licenses */}
+          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+            <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
+              <h3 className="text-lg leading-6 font-medium text-gray-900">Used Licenses</h3>
+            </div>
+            {licenses.filter(l => l.status === 'used').length === 0 ? (
+              <div className="p-12 text-center text-gray-500">
+                No used licenses found.
+              </div>
+            ) : (
+              <ul className="divide-y divide-gray-200">
+                {licenses.filter(l => l.status === 'used').map((license) => (
+                  <li key={license.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-3">
+                          <p className="text-sm font-medium text-blue-600 truncate font-mono">
+                            {license.key}
+                          </p>
+                          <button
+                            onClick={() => copyToClipboard(license.key)}
+                            className="text-gray-400 hover:text-gray-600 transition-colors"
+                            title="Copy to clipboard"
+                          >
+                            {copySuccess === license.key ? (
+                              <Check className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </button>
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            license.status === 'active' ? 'bg-green-100 text-green-800' :
+                            license.status === 'used' ? 'bg-blue-100 text-blue-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {license.status}
+                          </span>
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                            {license.type}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex">
+                          <div className="flex items-center text-sm text-gray-500">
+                            <span className="truncate">
+                              {license.hardware_id ? `Bound to: ${license.hardware_id}` : 'Not activated yet'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end text-sm text-gray-500">
+                        <span>Created: {new Date(license.created_at).toLocaleDateString()}</span>
+                        {license.activated_at && (
+                          <span className="text-xs text-gray-400">
+                            Activated: {new Date(license.activated_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Generate Modal */}
       {showModal && (
