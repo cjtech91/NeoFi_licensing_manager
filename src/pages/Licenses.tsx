@@ -63,14 +63,7 @@ export default function Licenses() {
       
       const { data, error } = await (supabase
         .from('licenses') as any)
-        .insert([
-          {
-            key,
-            type: newLicenseType,
-            status: 'active',
-            created_by: session?.user.id
-          }
-        ])
+        .insert([{ key, type: newLicenseType, status: 'active' }])
         .select()
         .single();
 
@@ -118,14 +111,7 @@ export default function Licenses() {
              const retryKey = generateLicenseKey();
              const { data: retryData, error: retryError } = await (supabase
                 .from('licenses') as any)
-                .insert([
-                  {
-                    key: retryKey,
-                    type: newLicenseType,
-                    status: 'active',
-                    created_by: session?.user.id
-                  }
-                ])
+                 .insert([{ key: retryKey, type: newLicenseType, status: 'active' }])
                 .select()
                 .single();
               
