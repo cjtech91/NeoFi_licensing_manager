@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Key, Plus, Copy, Check, RefreshCw, Loader2, ShieldCheck } from 'lucide-react';
+import { Database } from '../types/supabase';
 
 interface License {
   id: string;
@@ -21,6 +22,7 @@ export default function Licenses() {
   const [generating, setGenerating] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [newLicenseType, setNewLicenseType] = useState<'lifetime' | 'subscription' | 'trial'>('lifetime');
+  const [newLicenseQty, setNewLicenseQty] = useState<number>(1);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
 
   useEffect(() => {
@@ -64,17 +66,20 @@ export default function Licenses() {
         alert('Please sign in to generate a license.');
         return;
       }
-      const key = generateLicenseKey();
-      
-      const { data, error } = await (supabase
-        .from('licenses') as any)
-        .insert([{ key, type: newLicenseType, status: 'active' }])
-        .select()
-        .single();
+      const qty = Math.max(1, Math.min(100, Number.isFinite(newLicenseQty) ? Math.floor(newLicenseQty) : 1));
+      const items = Array.from({ length: qty }, () => ({
+        key: generateLicenseKey(),
+        type: newLicenseType,
+        status: 'active',
+      }));
+      const { data, error } = await supabase
+        .from<Database['public']['Tables']['licenses']['Row']>('licenses')
+        .insert(items)
+        .select();
 
       if (error) throw error;
 
-      setLicenses([data, ...licenses]);
+      setLicenses([...(data || []), ...licenses]);
       setShowModal(false);
     } catch (error: unknown) {
       console.error('Error generating license:', error);
@@ -82,7 +87,10 @@ export default function Licenses() {
       if (error instanceof Error) {
         errorMessage = error.message;
       } else if (typeof error === 'object' && error !== null && 'message' in error) {
-        errorMessage = (error as any).message;
+        const maybeMsg = error as { message?: string };
+        if (typeof maybeMsg.message === 'string') {
+          errorMessage = maybeMsg.message;
+        }
       } else if (typeof error === 'string') {
         errorMessage = error;
       } else {
@@ -95,33 +103,36 @@ export default function Licenses() {
       }
 
       // Check for foreign key violation (missing user in public.users)
-      if (errorMessage.includes('licenses_created_by_fkey') || 
-          (typeof error === 'object' && error !== null && 'code' in error && (error as any).code === '23503')) {
+      const maybeCode = (typeof error === 'object' && error !== null && 'code' in (error as Record<string, unknown>))
+        ? (error as { code?: string }).code
+        : undefined;
+      if (errorMessage.includes('licenses_created_by_fkey') || maybeCode === '23503') {
         
         try {
           // Attempt to self-heal: create the missing user record
-          const { error: healError } = await (supabase.from('users') as any).insert({
-            id: session?.user.id,
-            email: session?.user.email,
-            role: 'operator',
-            // @ts-ignore - password_hash is required by DB but not in types yet if we didn't update them fully, 
-            // or if we are using the types from the file we patched earlier.
-            // Actually, we did update types, but let's check if we need to cast.
-            // We'll just pass it.
-            password_hash: 'managed_by_supabase_auth' 
-          });
+          const { error: healError } = await supabase
+            .from<Database['public']['Tables']['users']['Row']>('users')
+            .insert({
+              id: session?.user.id as string,
+              email: session?.user.email as string,
+              role: 'operator',
+              password_hash: 'managed_by_supabase_auth'
+            });
 
           if (!healError) {
              // Retry generation once
-             const retryKey = generateLicenseKey();
-             const { data: retryData, error: retryError } = await (supabase
-                .from('licenses') as any)
-                 .insert([{ key: retryKey, type: newLicenseType, status: 'active' }])
-                .select()
-                .single();
+             const retryItems = [{
+               key: generateLicenseKey(),
+               type: newLicenseType,
+               status: 'active'
+             }];
+             const { data: retryData, error: retryError } = await supabase
+                .from<Database['public']['Tables']['licenses']['Row']>('licenses')
+                 .insert(retryItems)
+                .select();
               
               if (!retryError) {
-                setLicenses([retryData, ...licenses]);
+                setLicenses([...(retryData || []), ...licenses]);
                 setShowModal(false);
                 alert('License generated successfully! (User account link was fixed automatically)');
                 return;
@@ -143,8 +154,8 @@ export default function Licenses() {
       if (!session?.user?.id) return;
       const ok = window.confirm('Revoke this license? This will unbind the device.');
       if (!ok) return;
-      const { data, error } = await (supabase
-        .from('licenses') as any)
+      const { data, error } = await supabase
+        .from<Database['public']['Tables']['licenses']['Row']>('licenses')
         .update({ status: 'revoked', hardware_id: null, activated_at: null, machine_id: null })
         .eq('id', licenseId)
         .select()
@@ -463,7 +474,7 @@ export default function Licenses() {
                       </label>
                       <select
                         value={newLicenseType}
-                        onChange={(e) => setNewLicenseType(e.target.value as any)}
+                        onChange={(e) => setNewLicenseType(e.target.value as 'lifetime' | 'subscription' | 'trial')}
                         className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                       >
                         <option value="lifetime">Lifetime</option>
@@ -490,6 +501,20 @@ export default function Licenses() {
                 >
                   Cancel
                 </button>
+              </div>
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 text-left mb-1">
+                  Quantity
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={newLicenseQty}
+                  onChange={(e) => setNewLicenseQty(parseInt(e.target.value || '1', 10))}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+                <p className="mt-1 text-xs text-gray-500">Up to 100 at once.</p>
               </div>
             </div>
           </div>
