@@ -138,6 +138,25 @@ export default function Licenses() {
     }
   };
 
+  const handleRevokeLicense = async (licenseId: string) => {
+    try {
+      if (!session?.user?.id) return;
+      const ok = window.confirm('Revoke this license? This will unbind the device.');
+      if (!ok) return;
+      const { data, error } = await (supabase
+        .from('licenses') as any)
+        .update({ status: 'revoked', hardware_id: null, activated_at: null, machine_id: null })
+        .eq('id', licenseId)
+        .select()
+        .single();
+      if (error) throw error;
+      setLicenses(licenses.map(l => (l.id === licenseId ? data : l)));
+    } catch (e) {
+      console.error('Error revoking license:', e);
+      alert('Failed to revoke license');
+    }
+  };
+
   const copyToClipboard = (key: string) => {
     navigator.clipboard.writeText(key);
     setCopySuccess(key);
@@ -266,6 +285,12 @@ export default function Licenses() {
                           <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
                             {license.type}
                           </span>
+                          <button
+                            onClick={() => handleRevokeLicense(license.id)}
+                            className="ml-2 px-2 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200"
+                          >
+                            Revoke
+                          </button>
                         </div>
                         <div className="mt-2 flex">
                           <div className="flex items-center text-sm text-gray-500">
@@ -315,6 +340,12 @@ export default function Licenses() {
                           <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
                             {license.type}
                           </span>
+                          <button
+                            onClick={() => handleRevokeLicense(license.id)}
+                            className="ml-2 px-2 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200"
+                          >
+                            Revoke
+                          </button>
                         </div>
                         <div className="mt-2 text-sm text-gray-500">
                           <p className="flex items-center">
