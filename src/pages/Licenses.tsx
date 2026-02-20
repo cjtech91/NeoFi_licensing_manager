@@ -240,7 +240,7 @@ export default function Licenses() {
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">Active Licenses</dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {licenses.filter(l => l.status === 'active' || l.status === 'used').length}
+                    {licenses.filter(l => l.status === 'active' || l.status === 'revoked').length}
                   </dd>
                 </dl>
               </div>
@@ -280,13 +280,13 @@ export default function Licenses() {
             <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
               <h3 className="text-lg leading-6 font-medium text-gray-900">Available Licenses</h3>
             </div>
-            {licenses.filter(l => l.status === 'active').length === 0 ? (
+            {licenses.filter(l => l.status === 'active' || l.status === 'revoked').length === 0 ? (
               <div className="p-12 text-center text-gray-500">
                 No available licenses found. Generate one to get started.
               </div>
             ) : (
               <ul className="divide-y divide-gray-200">
-                {licenses.filter(l => l.status === 'active').map((license) => (
+                {licenses.filter(l => l.status === 'active' || l.status === 'revoked').map((license) => (
                   <li key={license.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
@@ -306,11 +306,11 @@ export default function Licenses() {
                             )}
                           </button>
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            license.status === 'active' ? 'bg-green-100 text-green-800' :
+                            (license.status === 'active' || license.status === 'revoked') ? 'bg-green-100 text-green-800' :
                             license.status === 'used' ? 'bg-blue-100 text-blue-800' :
-                            'bg-red-100 text-red-800'
+                            'bg-gray-100 text-gray-800'
                           }`}>
-                            {license.status}
+                            {license.status === 'revoked' ? 'available' : license.status}
                           </span>
                           <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
                             {license.type}
