@@ -172,6 +172,26 @@ export default function Licenses() {
     setCopySuccess(key);
     setTimeout(() => setCopySuccess(null), 2000);
   };
+  
+  const handleBindHardware = async (licenseId: string) => {
+    try {
+      if (!session?.user?.id) return;
+      const hwid = window.prompt('Enter Hardware ID to bind');
+      if (!hwid) return;
+      const { data, error } = await (supabase
+        .from('licenses') as any)
+        .update({ hardware_id: hwid })
+        .eq('id', licenseId)
+        .select()
+        .single();
+      if (error) throw error;
+      setLicenses(licenses.map(l => (l.id === licenseId ? data : l)));
+      alert('License bound to hardware successfully');
+    } catch (e) {
+      console.error('Error binding hardware:', e);
+      alert('Failed to bind hardware');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -237,7 +257,7 @@ export default function Licenses() {
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">Used Licenses</dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {licenses.filter(l => l.hardware_id !== null || l.status === 'used').length}
+                    {licenses.filter(l => l.hardware_id !== null || l.activated_at !== null || l.status === 'used').length}
                   </dd>
                 </dl>
               </div>
@@ -301,6 +321,12 @@ export default function Licenses() {
                           >
                             Revoke
                           </button>
+                          <button
+                            onClick={() => handleBindHardware(license.id)}
+                            className="ml-2 px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                          >
+                            Bind HWID
+                          </button>
                         </div>
                         <div className="mt-2 flex">
                           <div className="flex items-center text-sm text-gray-500">
@@ -330,13 +356,13 @@ export default function Licenses() {
             <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
               <h3 className="text-lg leading-6 font-medium text-gray-900">Used Licenses</h3>
             </div>
-            {licenses.filter(l => l.hardware_id !== null || l.status === 'used').length === 0 ? (
+            {licenses.filter(l => l.hardware_id !== null || l.activated_at !== null || l.status === 'used').length === 0 ? (
               <div className="p-12 text-center text-gray-500">
                 No used licenses found.
               </div>
             ) : (
               <ul className="divide-y divide-gray-200">
-                {licenses.filter(l => l.hardware_id !== null || l.status === 'used').map((license) => (
+                {licenses.filter(l => l.hardware_id !== null || l.activated_at !== null || l.status === 'used').map((license) => (
                   <li key={license.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
