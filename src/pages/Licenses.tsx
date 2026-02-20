@@ -72,8 +72,8 @@ export default function Licenses() {
         type: newLicenseType,
         status: 'active',
       }));
-      const { data, error } = await supabase
-        .from<Database['public']['Tables']['licenses']['Row']>('licenses')
+      const { data, error } = await (supabase
+        .from('licenses') as any)
         .insert(items)
         .select();
 
@@ -110,8 +110,8 @@ export default function Licenses() {
         
         try {
           // Attempt to self-heal: create the missing user record
-          const { error: healError } = await supabase
-            .from<Database['public']['Tables']['users']['Row']>('users')
+          const { error: healError } = await (supabase
+            .from('users') as any)
             .insert({
               id: session?.user.id as string,
               email: session?.user.email as string,
@@ -126,8 +126,8 @@ export default function Licenses() {
                type: newLicenseType,
                status: 'active'
              }];
-             const { data: retryData, error: retryError } = await supabase
-                .from<Database['public']['Tables']['licenses']['Row']>('licenses')
+             const { data: retryData, error: retryError } = await (supabase
+                .from('licenses') as any)
                  .insert(retryItems)
                 .select();
               
@@ -154,8 +154,8 @@ export default function Licenses() {
       if (!session?.user?.id) return;
       const ok = window.confirm('Revoke this license? This will unbind the device.');
       if (!ok) return;
-      const { data, error } = await supabase
-        .from<Database['public']['Tables']['licenses']['Row']>('licenses')
+      const { data, error } = await (supabase
+        .from('licenses') as any)
         .update({ status: 'revoked', hardware_id: null, activated_at: null, machine_id: null })
         .eq('id', licenseId)
         .select()
