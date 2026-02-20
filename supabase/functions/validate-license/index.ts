@@ -83,6 +83,11 @@ export default async function handler(req: Request): Promise<Response> {
         .select()
         .single();
 
+      if (updErr?.code === '23505') {
+        await logValidation(supabase, lic.id, body.hwid, false, 'mismatch', 'HWID already bound to another license', body.device_model, req);
+        return json({ allowed: false, status: 'mismatch', message: 'HWID already bound to another license', license: toPublic(lic) }, 409);
+      }
+
       if (updErr || !updated) {
         await logValidation(supabase, lic.id, body.hwid, false, 'not_found', 'Failed to bind hardware', body.device_model, req);
         return json({ allowed: false, status: 'not_found', message: 'Failed to bind hardware', license: toPublic(lic) }, 500);
