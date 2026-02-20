@@ -155,7 +155,7 @@ export default function Licenses() {
       if (!ok) return;
       const { data, error } = await (supabase
         .from('licenses') as any)
-        .update({ status: 'active', hardware_id: null, activated_at: null, machine_id: null })
+        .update({ status: 'revoked' })
         .eq('id', licenseId)
         .select()
         .single();
