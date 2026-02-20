@@ -155,7 +155,7 @@ export default function Licenses() {
       if (!ok) return;
       const { data, error } = await (supabase
         .from('licenses') as any)
-        .update({ status: 'revoked', hardware_id: null, activated_at: null, machine_id: null })
+        .update({ status: 'active', hardware_id: null, activated_at: null, machine_id: null })
         .eq('id', licenseId)
         .select()
         .single();
@@ -237,7 +237,7 @@ export default function Licenses() {
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">Used Licenses</dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {licenses.filter(l => l.status === 'used' || l.status === 'revoked').length}
+                    {licenses.filter(l => l.status === 'used').length}
                   </dd>
                 </dl>
               </div>
@@ -330,13 +330,13 @@ export default function Licenses() {
             <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
               <h3 className="text-lg leading-6 font-medium text-gray-900">Used Licenses</h3>
             </div>
-            {licenses.filter(l => l.status === 'used' || l.status === 'revoked').length === 0 ? (
+            {licenses.filter(l => l.status === 'used').length === 0 ? (
               <div className="p-12 text-center text-gray-500">
                 No used licenses found.
               </div>
             ) : (
               <ul className="divide-y divide-gray-200">
-                {licenses.filter(l => l.status === 'used' || l.status === 'revoked').map((license) => (
+                {licenses.filter(l => l.status === 'used').map((license) => (
                   <li key={license.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
@@ -344,10 +344,8 @@ export default function Licenses() {
                           <p className="text-sm font-medium text-blue-600 truncate font-mono">
                             {license.key}
                           </p>
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            license.status === 'used' ? 'bg-blue-100 text-blue-800' : 'bg-blue-50 text-blue-700'
-                          }`}>
-                            {license.status === 'revoked' ? 'used' : license.status}
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                            {license.status}
                           </span>
                           <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
                             {license.type}

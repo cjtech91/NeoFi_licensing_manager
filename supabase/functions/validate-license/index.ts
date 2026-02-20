@@ -64,22 +64,8 @@ export default async function handler(req: Request): Promise<Response> {
 
     // Revocation check
     if (lic.status === 'revoked') {
-      if (!lic.hardware_id) {
-        const { data: rebound, error: reboundErr } = await supabase
-          .from<LicenseRow>('licenses')
-          .update({ hardware_id: body.hwid })
-          .eq('id', lic.id)
-          .select()
-          .single();
-        if (reboundErr || !rebound) {
-          await logValidation(supabase, lic.id, body.hwid, false, 'revoked', 'Failed to rebind revoked license', body.device_model, req);
-          return json({ allowed: false, status: 'revoked', message: 'Failed to rebind revoked license', license: toPublic(lic) }, 500);
-        }
-        await logValidation(supabase, rebound.id, body.hwid, true, rebound.status, 'Revoked license rebound to new device', body.device_model, req);
-        return json({ allowed: true, status: rebound.status, message: 'Revoked license rebound to new device', license: toPublic(rebound) });
-      }
-      await logValidation(supabase, lic.id, body.hwid, false, 'revoked', 'License revoked and already bound', body.device_model, req);
-      return json({ allowed: false, status: 'revoked', message: 'License revoked and already bound', license: toPublic(lic) }, 403);
+      await logValidation(supabase, lic.id, body.hwid, false, 'revoked', 'License revoked', body.device_model, req);
+      return json({ allowed: false, status: 'revoked', message: 'License revoked', license: toPublic(lic) }, 403);
     }
 
     // Mismatch check
