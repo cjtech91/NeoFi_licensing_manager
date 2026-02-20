@@ -140,6 +140,29 @@ export interface Database {
           created_at?: string
         }
       }
+      sub_vendo_licenses: {
+        Row: {
+          key: string
+          hardware_id: string | null
+          status: 'unused' | 'active' | 'revoked'
+          activated_at: string | null
+          created_at: string
+        }
+        Insert: {
+          key: string
+          hardware_id?: string | null
+          status?: 'unused' | 'active' | 'revoked'
+          activated_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          key?: string
+          hardware_id?: string | null
+          status?: 'unused' | 'active' | 'revoked'
+          activated_at?: string | null
+          created_at?: string
+        }
+      }
       sales: {
         Row: {
           id: string

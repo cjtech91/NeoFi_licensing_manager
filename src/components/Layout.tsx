@@ -7,6 +7,7 @@ import {
   Wifi, 
   BarChart3, 
   Key,
+  Cpu,
   LogOut, 
   Menu,
   X
@@ -28,6 +29,7 @@ export default function Layout() {
     { name: 'Vouchers', href: '/vouchers', icon: Ticket },
     { name: 'Machines', href: '/machines', icon: Wifi },
     { name: 'Licenses', href: '/licenses', icon: Key },
+    { name: 'Sub Vendo', href: '/sub-vendo', icon: Cpu },
     { name: 'Reports', href: '/reports', icon: BarChart3 },
   ];
 

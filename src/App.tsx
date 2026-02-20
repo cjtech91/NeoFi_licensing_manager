@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Vouchers from './pages/Vouchers';
 import Machines from './pages/Machines';
 import Licenses from './pages/Licenses';
+import SubVendo from './pages/SubVendo';
 import Reports from './pages/Reports';
 import Layout from './components/Layout';
 
@@ -48,6 +49,7 @@ function App() {
             <Route path="vouchers" element={<Vouchers />} />
             <Route path="machines" element={<Machines />} />
             <Route path="licenses" element={<Licenses />} />
+            <Route path="sub-vendo" element={<SubVendo />} />
             <Route path="reports" element={<Reports />} />
           </Route>
         </Routes>
