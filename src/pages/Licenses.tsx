@@ -192,6 +192,26 @@ export default function Licenses() {
       alert('Failed to bind hardware');
     }
   };
+  
+  const handleUnbindHardware = async (licenseId: string) => {
+    try {
+      if (!session?.user?.id) return;
+      const ok = window.confirm('Unbind this license from its hardware?');
+      if (!ok) return;
+      const { data, error } = await (supabase
+        .from('licenses') as any)
+        .update({ hardware_id: null, activated_at: null, machine_id: null })
+        .eq('id', licenseId)
+        .select()
+        .single();
+      if (error) throw error;
+      setLicenses(licenses.map(l => (l.id === licenseId ? data : l)));
+      alert('License unbound successfully');
+    } catch (e) {
+      console.error('Error unbinding hardware:', e);
+      alert('Failed to unbind hardware');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -327,6 +347,14 @@ export default function Licenses() {
                           >
                             Bind HWID
                           </button>
+                          {license.hardware_id && (
+                            <button
+                              onClick={() => handleUnbindHardware(license.id)}
+                              className="ml-2 px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                            >
+                              Unbind HWID
+                            </button>
+                          )}
                         </div>
                         <div className="mt-2 flex">
                           <div className="flex items-center text-sm text-gray-500">
