@@ -102,20 +102,20 @@ export default function SubVendo() {
   const handleBindHardware = async (key: string) => {
     try {
       if (!session?.user?.id) return;
-      const hwid = window.prompt('Enter ESP8266 Hardware ID to bind');
-      if (!hwid) return;
+      const systemSerial = window.prompt('Enter System Serial to bind');
+      if (!systemSerial) return;
       const { data, error } = await (supabase
         .from('sub_vendo_licenses') as any)
-        .update({ hardware_id: hwid, status: 'active', activated_at: new Date().toISOString() })
+        .update({ hardware_id: systemSerial, status: 'active', activated_at: new Date().toISOString() })
         .eq('key', key)
         .select()
         .single();
       if (error) throw error;
       setLicenses(licenses.map(l => (l.key === key ? data : l)));
-      alert('License bound to hardware successfully');
+      alert('License bound to System Serial successfully');
     } catch (e) {
-      console.error('Error binding hardware:', e);
-      alert('Failed to bind hardware');
+      console.error('Error binding System Serial:', e);
+      alert('Failed to bind System Serial');
     }
   };
 
@@ -134,8 +134,8 @@ export default function SubVendo() {
       setLicenses(licenses.map(l => (l.key === key ? data : l)));
       alert('License unbound successfully');
     } catch (e) {
-      console.error('Error unbinding hardware:', e);
-      alert('Failed to unbind hardware');
+      console.error('Error unbinding System Serial:', e);
+      alert('Failed to unbind System Serial');
     }
   };
 
@@ -266,7 +266,7 @@ export default function SubVendo() {
                             onClick={() => handleBindHardware(license.key)}
                             className="ml-2 px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
                           >
-                            Bind HWID
+                            Bind Serial
                           </button>
                         </div>
                         <div className="mt-2 text-sm text-gray-500">
@@ -312,12 +312,12 @@ export default function SubVendo() {
                             onClick={() => handleUnbindHardware(license.key)}
                             className="ml-2 px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
                           >
-                            Unbind HWID
+                            Unbind Serial
                           </button>
                         </div>
                         <div className="mt-2 text-sm text-gray-500">
                           <p className="flex items-center">
-                            <span className="font-medium mr-2">Hardware ID:</span>
+                            <span className="font-medium mr-2">System Serial:</span>
                             <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">
                               {license.hardware_id || 'N/A'}
                             </code>

@@ -176,27 +176,27 @@ export default function Licenses() {
   const handleBindHardware = async (licenseId: string) => {
     try {
       if (!session?.user?.id) return;
-      const hwid = window.prompt('Enter Hardware ID to bind');
-      if (!hwid) return;
+      const systemSerial = window.prompt('Enter System Serial to bind');
+      if (!systemSerial) return;
       const { data, error } = await (supabase
         .from('licenses') as any)
-        .update({ hardware_id: hwid })
+        .update({ hardware_id: systemSerial })
         .eq('id', licenseId)
         .select()
         .single();
       if (error) throw error;
       setLicenses(licenses.map(l => (l.id === licenseId ? data : l)));
-      alert('License bound to hardware successfully');
+      alert('License bound to System Serial successfully');
     } catch (e) {
-      console.error('Error binding hardware:', e);
-      alert('Failed to bind hardware');
+      console.error('Error binding System Serial:', e);
+      alert('Failed to bind System Serial');
     }
   };
   
   const handleUnbindHardware = async (licenseId: string) => {
     try {
       if (!session?.user?.id) return;
-      const ok = window.confirm('Unbind this license from its hardware?');
+      const ok = window.confirm('Unbind this license from its System Serial?');
       if (!ok) return;
       const { data, error } = await (supabase
         .from('licenses') as any)
@@ -208,8 +208,8 @@ export default function Licenses() {
       setLicenses(licenses.map(l => (l.id === licenseId ? data : l)));
       alert('License unbound successfully');
     } catch (e) {
-      console.error('Error unbinding hardware:', e);
-      alert('Failed to unbind hardware');
+      console.error('Error unbinding System Serial:', e);
+      alert('Failed to unbind System Serial');
     }
   };
 
@@ -345,14 +345,14 @@ export default function Licenses() {
                             onClick={() => handleBindHardware(license.id)}
                             className="ml-2 px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
                           >
-                            Bind HWID
+                            Bind Serial
                           </button>
                           {license.hardware_id && (
                             <button
                               onClick={() => handleUnbindHardware(license.id)}
                               className="ml-2 px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
                             >
-                              Unbind HWID
+                              Unbind Serial
                             </button>
                           )}
                         </div>
@@ -413,7 +413,7 @@ export default function Licenses() {
                         </div>
                         <div className="mt-2 text-sm text-gray-500">
                           <p className="flex items-center">
-                            <span className="font-medium mr-2">Hardware ID:</span>
+                            <span className="font-medium mr-2">System Serial:</span>
                             <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">
                               {license.hardware_id || 'N/A'}
                             </code>
