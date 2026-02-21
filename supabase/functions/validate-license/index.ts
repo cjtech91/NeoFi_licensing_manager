@@ -191,7 +191,7 @@ async function logValidation(
   req: Request
 ) {
   const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || '';
-  await supabase.from('license_validations').insert({
+  const { error } = await supabase.from('license_validations').insert({
     license_id,
     system_serial,
     allowed,
@@ -200,4 +200,7 @@ async function logValidation(
     device_model: device_model || null,
     ip,
   });
+  if (error) {
+    return;
+  }
 }

@@ -110,6 +110,7 @@ export interface Database {
           type: 'lifetime' | 'subscription' | 'trial'
           machine_id: string | null
           hardware_id: string | null
+          system_serial: string | null
           created_by: string | null
           activated_at: string | null
           expires_at: string | null
@@ -122,6 +123,7 @@ export interface Database {
           type?: 'lifetime' | 'subscription' | 'trial'
           machine_id?: string | null
           hardware_id?: string | null
+          system_serial?: string | null
           created_by?: string | null
           activated_at?: string | null
           expires_at?: string | null
@@ -134,6 +136,7 @@ export interface Database {
           type?: 'lifetime' | 'subscription' | 'trial'
           machine_id?: string | null
           hardware_id?: string | null
+          system_serial?: string | null
           created_by?: string | null
           activated_at?: string | null
           expires_at?: string | null
@@ -144,6 +147,7 @@ export interface Database {
         Row: {
           key: string
           hardware_id: string | null
+          system_serial: string | null
           status: 'unused' | 'active' | 'revoked'
           activated_at: string | null
           created_at: string
@@ -151,6 +155,7 @@ export interface Database {
         Insert: {
           key: string
           hardware_id?: string | null
+          system_serial?: string | null
           status?: 'unused' | 'active' | 'revoked'
           activated_at?: string | null
           created_at?: string
@@ -158,6 +163,7 @@ export interface Database {
         Update: {
           key?: string
           hardware_id?: string | null
+          system_serial?: string | null
           status?: 'unused' | 'active' | 'revoked'
           activated_at?: string | null
           created_at?: string
