@@ -235,11 +235,11 @@ export default function Licenses() {
   const handleRevokeLicense = async (licenseId: string) => {
     try {
       if (!session?.user?.id) return;
-      const ok = window.confirm('Revoke this license? This will unbind the device.');
+      const ok = window.confirm('Revoke this license? This will lock the device immediately.');
       if (!ok) return;
       const { data, error } = await (supabase
         .from('licenses') as any)
-        .update({ status: 'revoked', system_serial: null, activated_at: null, machine_id: null })
+        .update({ status: 'revoked' })
         .eq('id', licenseId)
         .select()
         .single();

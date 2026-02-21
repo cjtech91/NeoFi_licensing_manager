@@ -112,11 +112,11 @@ export default function SubVendo() {
   const handleRevokeLicense = async (key: string) => {
     try {
       if (!session?.user?.id) return;
-      const ok = window.confirm('Revoke this license? This will unbind the device.');
+      const ok = window.confirm('Revoke this license? This will lock the device immediately.');
       if (!ok) return;
       const { data, error } = await (supabase
         .from('sub_vendo_licenses') as any)
-        .update({ status: 'revoked', system_serial: null, activated_at: null })
+        .update({ status: 'revoked' })
         .eq('key', key)
         .select()
         .single();
