@@ -56,15 +56,37 @@ export default async function handler(req: Request): Promise<Response> {
     // Accept system_serial or hwid (for backward compatibility with older clients)
     const deviceId = body.system_serial || body.hwid;
 
-    if (!body?.key || !deviceId) {
-      return json({ allowed: false, status: 'not_found', message: 'Missing key or device ID (system_serial)' }, 400);
+    if (!deviceId) {
+      return json({ allowed: false, status: 'not_found', message: 'Missing device ID (system_serial)' }, 400);
     }
 
-    const { data: lic, error } = await supabase
-      .from<LicenseRow>('licenses')
-      .select('*')
-      .eq('key', body.key)
-      .single();
+    let lic: LicenseRow | null = null;
+    let error = null;
+
+    // Scenario A: Key is provided (Activation or explicit validation)
+    if (body.key) {
+      const result = await supabase
+        .from<LicenseRow>('licenses')
+        .select('*')
+        .eq('key', body.key)
+        .single();
+      lic = result.data;
+      error = result.error;
+    } 
+    // Scenario B: No key provided, try to restore/validate by Device ID (Auto-login)
+    else {
+      // Find a valid license bound to this device
+      const result = await supabase
+        .from<LicenseRow>('licenses')
+        .select('*')
+        .eq('system_serial', deviceId)
+        .in('status', ['active', 'used']) // Only find valid licenses
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      lic = result.data;
+      error = result.error;
+    }
 
     if (error || !lic) {
       return json({ allowed: false, status: 'not_found', message: 'License not found' }, 404);
@@ -82,7 +104,7 @@ export default async function handler(req: Request): Promise<Response> {
       return json({ allowed: false, status: 'revoked', message: 'License revoked', license: toPublic(lic) }, 403);
     }
 
-    // Mismatch check
+    // Mismatch check (Only if validating a specific key that is already bound)
     const existingDeviceId = lic.system_serial;
     if (existingDeviceId && existingDeviceId !== deviceId) {
       await logValidation(supabase, lic.id, deviceId, false, 'mismatch', 'License bound to a different device', body.device_model, req);
@@ -118,6 +140,7 @@ export default async function handler(req: Request): Promise<Response> {
       return json({ allowed: true, status: updated.status, message: 'License activated and bound to device', license: toPublic(updated) });
     }
 
+    // Success path (Already bound or recovered via serial)
     await logValidation(supabase, lic.id, deviceId, true, lic.status, 'License valid', body.device_model, req);
     return json({ allowed: true, status: lic.status, message: 'License valid', license: toPublic(lic) });
   } catch {
