@@ -28,6 +28,20 @@ export default function Licenses() {
 
   useEffect(() => {
     fetchLicenses();
+    const channel = supabase
+      .channel('licenses-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'licenses' },
+        () => {
+          fetchLicenses();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [session]);
 
   const fetchLicenses = async () => {
