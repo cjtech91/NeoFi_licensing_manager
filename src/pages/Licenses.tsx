@@ -15,19 +15,37 @@ interface License {
   activated_at: string | null;
 }
 
+interface Activation {
+  id: string;
+  created_at: string;
+  license_id: string | null;
+  license_key: string | null;
+  system_serial: string | null;
+  hwid: string | null;
+  device_model: string | null;
+  status: string | null;
+  activated_at: string | null;
+  message: string | null;
+}
+
 export default function Licenses() {
   const { session } = useAuth();
   const [licenses, setLicenses] = useState<License[]>([]);
+  const [activations, setActivations] = useState<Activation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingActivations, setLoadingActivations] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [newLicenseType, setNewLicenseType] = useState<'lifetime' | 'subscription' | 'trial'>('lifetime');
   const [newLicenseQty, setNewLicenseQty] = useState<number>(1);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [activationSearch, setActivationSearch] = useState<string>('');
+  const [activationModel, setActivationModel] = useState<string>('all');
 
   useEffect(() => {
     fetchLicenses();
+    fetchActivations();
     const channel = supabase
       .channel('licenses-realtime')
       .on(
@@ -35,6 +53,13 @@ export default function Licenses() {
         { event: '*', schema: 'public', table: 'licenses' },
         () => {
           fetchLicenses();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'activations' },
+        () => {
+          fetchActivations();
         }
       )
       .subscribe();
@@ -58,6 +83,23 @@ export default function Licenses() {
       console.error('Error fetching licenses:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchActivations = async () => {
+    try {
+      setLoadingActivations(true);
+      const { data, error } = await supabase
+        .from('activations')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      setActivations(data || []);
+    } catch (error) {
+      console.error('Error fetching activations:', error);
+    } finally {
+      setLoadingActivations(false);
     }
   };
 
@@ -497,6 +539,105 @@ export default function Licenses() {
                             Machine ID: {license.machine_id}
                           </span>
                         )}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Recent Activations */}
+          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+            <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
+              <h3 className="text-lg leading-6 font-medium text-gray-900">Recent Activations</h3>
+            </div>
+            <div className="px-4 py-4 sm:px-6 flex items-center gap-2">
+              <input
+                value={activationSearch}
+                onChange={(e) => setActivationSearch(e.target.value)}
+                placeholder="Search by key, serial, or model"
+                className="inline-flex px-3 py-2 border border-gray-300 text-sm rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <select
+                value={activationModel}
+                onChange={(e) => setActivationModel(e.target.value)}
+                className="inline-flex px-3 py-2 border border-gray-300 text-sm rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="all">All models</option>
+                {[...new Set(activations.map(a => a.device_model).filter(Boolean))].map((m) => (
+                  <option key={m as string} value={m as string}>{m as string}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => { setActivationSearch(''); setActivationModel('all'); }}
+                className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Clear
+              </button>
+            </div>
+            {loadingActivations ? (
+              <div className="p-12 flex justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+              </div>
+            ) : activations.length === 0 ? (
+              <div className="p-12 text-center text-gray-500">
+                No activations recorded yet.
+              </div>
+            ) : (
+              <ul className="divide-y divide-gray-200">
+                {activations
+                  .filter((a) => {
+                    const q = activationSearch.trim().toLowerCase();
+                    const matchesQuery = !q || [
+                      a.license_key || '',
+                      a.system_serial || '',
+                      a.hwid || '',
+                      a.device_model || ''
+                    ].some(v => v.toLowerCase().includes(q));
+                    const matchesModel = activationModel === 'all' || (a.device_model || '') === activationModel;
+                    return matchesQuery && matchesModel;
+                  })
+                  .map((a) => (
+                  <li key={a.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <p className="text-sm font-medium text-blue-600 truncate font-mono">
+                            {a.license_key || 'N/A'}
+                          </p>
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            a.status === 'used' ? 'bg-blue-100 text-blue-800' :
+                            a.status === 'active' ? 'bg-green-100 text-green-800' :
+                            a.status === 'revoked' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {a.status || 'unknown'}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-sm text-gray-500">
+                          <p className="flex items-center">
+                            <span className="font-medium mr-2">System Serial:</span>
+                            <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">
+                              {a.system_serial || a.hwid || 'N/A'}
+                            </code>
+                          </p>
+                          <p className="mt-1 flex items-center">
+                            <span className="font-medium mr-2">Device Model:</span>
+                            <span>{a.device_model || 'N/A'}</span>
+                          </p>
+                          <p className="mt-1 flex items-center">
+                            <span className="font-medium mr-2">Activated:</span>
+                            <span>
+                              {a.activated_at 
+                                ? new Date(a.activated_at).toLocaleString() 
+                                : (a.created_at ? new Date(a.created_at).toLocaleString() : 'N/A')}
+                            </span>
+                          </p>
+                          {a.message && (
+                            <p className="mt-1 text-xs text-gray-400">{a.message}</p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </li>

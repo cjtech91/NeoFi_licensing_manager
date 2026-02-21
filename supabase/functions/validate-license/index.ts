@@ -137,6 +137,16 @@ export default async function handler(req: Request): Promise<Response> {
       }
 
       await logValidation(supabase, updated.id, deviceId, true, updated.status, 'License activated and bound to device', body.device_model, req);
+      await supabase.from('activations').insert({
+        license_id: updated.id,
+        license_key: updated.key,
+        system_serial: deviceId,
+        hwid: deviceId,
+        device_model: body.device_model || null,
+        status: updated.status,
+        activated_at: updated.activated_at,
+        message: 'Activated and bound to device'
+      });
       return json({ allowed: true, status: updated.status, message: 'License activated and bound to device', license: toPublic(updated) });
     }
 
