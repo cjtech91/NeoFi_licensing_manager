@@ -115,8 +115,6 @@ export default async function handler(req: Request): Promise<Response> {
         .from<LicenseRow>('licenses')
         .update({ 
           system_serial: deviceId,
-          hardware_id: deviceId,
-          hwid: deviceId,
           status: 'used',
           activated_at: lic.activated_at || new Date().toISOString()
         })
@@ -139,7 +137,6 @@ export default async function handler(req: Request): Promise<Response> {
         license_id: updated.id,
         license_key: updated.key,
         system_serial: deviceId,
-        hwid: null,
         device_model: body.device_model || null,
         status: updated.status,
         activated_at: updated.activated_at,
@@ -189,7 +186,7 @@ async function logValidation(
   const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || '';
   await supabase.from('license_validations').insert({
     license_id,
-    hwid: system_serial,
+    system_serial,
     allowed,
     status,
     message,
