@@ -53,10 +53,11 @@ export default async function handler(req: Request): Promise<Response> {
 
   try {
     const body = (await req.json()) as ValidateRequest;
-    const deviceId = body.system_serial;
+    // Accept system_serial or hwid (for backward compatibility with older clients)
+    const deviceId = body.system_serial || body.hwid;
 
     if (!body?.key || !deviceId) {
-      return json({ allowed: false, status: 'not_found', message: 'Missing key or system_serial' }, 400);
+      return json({ allowed: false, status: 'not_found', message: 'Missing key or device ID (system_serial)' }, 400);
     }
 
     const { data: lic, error } = await supabase
