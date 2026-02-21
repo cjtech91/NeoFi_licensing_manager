@@ -115,6 +115,8 @@ export default async function handler(req: Request): Promise<Response> {
         .from<LicenseRow>('licenses')
         .update({ 
           system_serial: deviceId,
+          hardware_id: deviceId,
+          hwid: deviceId,
           status: 'used',
           activated_at: lic.activated_at || new Date().toISOString()
         })
