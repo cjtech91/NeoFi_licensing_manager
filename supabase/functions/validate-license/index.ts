@@ -8,6 +8,7 @@ type LicenseRow = {
   machine_id: string | null;
   hardware_id: string | null;
   system_serial: string | null;
+  hwid: string | null;
   created_by: string | null;
   activated_at: string | null;
   expires_at: string | null;
@@ -118,12 +119,13 @@ export default async function handler(req: Request): Promise<Response> {
 }
 
 function toPublic(lic: LicenseRow): ValidateResponse['license'] {
+  const deviceId = lic.system_serial || lic.hardware_id || lic.hwid;
   return {
     key: lic.key,
     status: lic.status,
-    hardware_id: lic.system_serial || lic.hardware_id,
-    hwid: lic.system_serial || lic.hardware_id,
-    system_serial: lic.system_serial || lic.hardware_id,
+    hardware_id: deviceId,
+    hwid: deviceId,
+    system_serial: deviceId,
     activated_at: lic.activated_at,
     expires_at: lic.expires_at,
   };
