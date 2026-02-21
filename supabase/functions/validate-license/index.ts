@@ -95,6 +95,8 @@ export default async function handler(req: Request): Promise<Response> {
         .from<LicenseRow>('licenses')
         .update({ 
           system_serial: deviceId,
+          hardware_id: deviceId, // Sync for backward compatibility and triggers
+          hwid: deviceId,        // Sync for backward compatibility
           status: 'used',
           activated_at: lic.activated_at || new Date().toISOString()
         })
@@ -124,12 +126,13 @@ export default async function handler(req: Request): Promise<Response> {
 }
 
 function toPublic(lic: LicenseRow): ValidateResponse['license'] {
-  const deviceId = lic.system_serial;
+  // Use system_serial as the primary source of truth, fallback to others
+  const deviceId = lic.system_serial || lic.hwid || lic.hardware_id;
   return {
     key: lic.key,
     status: lic.status,
-    hardware_id: null, // Deprecated
-    hwid: null, // Deprecated
+    hardware_id: deviceId, // Populate for backward compatibility with older clients
+    hwid: deviceId,        // Populate for backward compatibility with older clients
     system_serial: deviceId,
     activated_at: lic.activated_at,
     expires_at: lic.expires_at,
