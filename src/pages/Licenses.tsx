@@ -9,6 +9,7 @@ interface License {
   status: 'active' | 'used' | 'revoked';
   type: 'lifetime' | 'subscription' | 'trial';
   hardware_id: string | null;
+  system_serial: string | null;
   machine_id: string | null;
   created_at: string;
   activated_at: string | null;
@@ -57,7 +58,7 @@ export default function Licenses() {
       const { data, error } = await supabase
         .from('licenses')
         .select('*')
-        .or(`key.ilike.%${q}%,hardware_id.ilike.%${q}%`)
+        .or(`key.ilike.%${q}%,system_serial.ilike.%${q}%`)
         .order('created_at', { ascending: false });
       if (error) throw error;
       setLicenses(data || []);
@@ -209,7 +210,7 @@ export default function Licenses() {
       if (!systemSerial) return;
       const { data, error } = await (supabase
         .from('licenses') as any)
-        .update({ hardware_id: systemSerial })
+        .update({ system_serial: systemSerial })
         .eq('id', licenseId)
         .select()
         .single();
@@ -229,7 +230,7 @@ export default function Licenses() {
       if (!ok) return;
       const { data, error } = await (supabase
         .from('licenses') as any)
-        .update({ hardware_id: null, activated_at: null, machine_id: null })
+        .update({ system_serial: null, activated_at: null, machine_id: null })
         .eq('id', licenseId)
         .select()
         .single();
@@ -347,13 +348,13 @@ export default function Licenses() {
             <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
               <h3 className="text-lg leading-6 font-medium text-gray-900">Available Licenses</h3>
             </div>
-            {licenses.filter(l => (l.status === 'active' && !l.hardware_id) || l.status === 'revoked').length === 0 ? (
+            {licenses.filter(l => (l.status === 'active' && !l.system_serial) || l.status === 'revoked').length === 0 ? (
               <div className="p-12 text-center text-gray-500">
                 No available licenses found. Generate one to get started.
               </div>
             ) : (
               <ul className="divide-y divide-gray-200">
-                {licenses.filter(l => (l.status === 'active' && !l.hardware_id) || l.status === 'revoked').map((license) => (
+                {licenses.filter(l => (l.status === 'active' && !l.system_serial) || l.status === 'revoked').map((license) => (
                   <li key={license.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
@@ -394,7 +395,7 @@ export default function Licenses() {
                           >
                             Bind Serial
                           </button>
-                          {license.hardware_id && (
+                          {license.system_serial && (
                             <button
                               onClick={() => handleUnbindHardware(license.id)}
                               className="ml-2 px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
@@ -406,7 +407,7 @@ export default function Licenses() {
                         <div className="mt-2 flex">
                           <div className="flex items-center text-sm text-gray-500">
                             <span className="truncate">
-                              {license.hardware_id ? `Bound to: ${license.hardware_id}` : 'Not activated yet'}
+                              {license.system_serial ? `Bound to: ${license.system_serial}` : 'Not activated yet'}
                             </span>
                           </div>
                         </div>
@@ -462,7 +463,7 @@ export default function Licenses() {
                           <p className="flex items-center">
                             <span className="font-medium mr-2">System Serial:</span>
                             <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">
-                              {license.hardware_id || 'N/A'}
+                              {license.system_serial || 'N/A'}
                             </code>
                           </p>
                           <p className="mt-1 flex items-center">

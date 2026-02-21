@@ -7,6 +7,7 @@ type LicenseRow = {
   type: 'lifetime' | 'subscription' | 'trial';
   machine_id: string | null;
   hardware_id: string | null;
+  system_serial: string | null;
   created_by: string | null;
   activated_at: string | null;
   expires_at: string | null;
@@ -80,16 +81,17 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     // Mismatch check
-    if (lic.hardware_id && lic.hardware_id !== deviceId) {
+    const existingDeviceId = lic.system_serial || lic.hardware_id;
+    if (existingDeviceId && existingDeviceId !== deviceId) {
       await logValidation(supabase, lic.id, deviceId, false, 'mismatch', 'License bound to a different device', body.device_model, req);
       return json({ allowed: false, status: 'mismatch', message: 'License bound to a different device', license: toPublic(lic) }, 409);
     }
 
     // First activation path: bind deviceId, DB trigger marks used + activated_at
-    if (!lic.hardware_id && lic.status === 'active') {
+    if (!existingDeviceId && lic.status === 'active') {
       const { data: updated, error: updErr } = await supabase
         .from<LicenseRow>('licenses')
-        .update({ hardware_id: deviceId })
+        .update({ system_serial: deviceId, hardware_id: deviceId }) // Update both for backward compatibility
         .eq('id', lic.id)
         .select()
         .single();
@@ -119,9 +121,9 @@ function toPublic(lic: LicenseRow): ValidateResponse['license'] {
   return {
     key: lic.key,
     status: lic.status,
-    hardware_id: lic.hardware_id,
-    hwid: lic.hardware_id,
-    system_serial: lic.hardware_id,
+    hardware_id: lic.system_serial || lic.hardware_id,
+    hwid: lic.system_serial || lic.hardware_id,
+    system_serial: lic.system_serial || lic.hardware_id,
     activated_at: lic.activated_at,
     expires_at: lic.expires_at,
   };

@@ -6,6 +6,7 @@ import { Key, Plus, Copy, Check, Loader2, ShieldCheck, Server } from 'lucide-rea
 interface SubVendoLicense {
   key: string;
   hardware_id: string | null;
+  system_serial: string | null;
   status: 'unused' | 'active' | 'revoked';
   activated_at: string | null;
   created_at: string;
@@ -53,7 +54,7 @@ export default function SubVendo() {
       const { data, error } = await supabase
         .from('sub_vendo_licenses')
         .select('*')
-        .or(`key.ilike.%${q}%,hardware_id.ilike.%${q}%`)
+        .or(`key.ilike.%${q}%,system_serial.ilike.%${q}%`)
         .order('created_at', { ascending: false });
       if (error) throw error;
       setLicenses(data || []);
@@ -116,7 +117,7 @@ export default function SubVendo() {
       if (!ok) return;
       const { data, error } = await (supabase
         .from('sub_vendo_licenses') as any)
-        .update({ status: 'revoked', hardware_id: null, activated_at: null })
+        .update({ status: 'revoked', system_serial: null, activated_at: null })
         .eq('key', key)
         .select()
         .single();
@@ -135,7 +136,7 @@ export default function SubVendo() {
       if (!systemSerial) return;
       const { data, error } = await (supabase
         .from('sub_vendo_licenses') as any)
-        .update({ hardware_id: systemSerial, status: 'active', activated_at: new Date().toISOString() })
+        .update({ system_serial: systemSerial, status: 'active', activated_at: new Date().toISOString() })
         .eq('key', key)
         .select()
         .single();
@@ -366,7 +367,7 @@ export default function SubVendo() {
                           <p className="flex items-center">
                             <span className="font-medium mr-2">System Serial:</span>
                             <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">
-                              {license.hardware_id || 'N/A'}
+                              {license.system_serial || 'N/A'}
                             </code>
                           </p>
                           <p className="mt-1 flex items-center">
