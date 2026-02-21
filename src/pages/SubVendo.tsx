@@ -156,7 +156,7 @@ export default function SubVendo() {
       if (!ok) return;
       const { data, error } = await (supabase
         .from('sub_vendo_licenses') as any)
-        .update({ hardware_id: null, activated_at: null, status: 'unused' })
+        .update({ system_serial: null, hardware_id: null, activated_at: null, status: 'unused' })
         .eq('key', key)
         .select()
         .single();

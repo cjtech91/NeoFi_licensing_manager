@@ -53,10 +53,10 @@ export default async function handler(req: Request): Promise<Response> {
 
   try {
     const body = (await req.json()) as ValidateRequest;
-    const deviceId = body.system_serial || body.hwid;
+    const deviceId = body.system_serial;
 
     if (!body?.key || !deviceId) {
-      return json({ allowed: false, status: 'not_found', message: 'Missing key or device ID (system_serial/hwid)' }, 400);
+      return json({ allowed: false, status: 'not_found', message: 'Missing key or system_serial' }, 400);
     }
 
     const { data: lic, error } = await supabase
@@ -82,17 +82,21 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     // Mismatch check
-    const existingDeviceId = lic.system_serial || lic.hardware_id;
+    const existingDeviceId = lic.system_serial;
     if (existingDeviceId && existingDeviceId !== deviceId) {
       await logValidation(supabase, lic.id, deviceId, false, 'mismatch', 'License bound to a different device', body.device_model, req);
       return json({ allowed: false, status: 'mismatch', message: 'License bound to a different device', license: toPublic(lic) }, 409);
     }
 
-    // First activation path: bind deviceId, DB trigger marks used + activated_at
-    if (!existingDeviceId && lic.status === 'active') {
+    // First activation path: bind deviceId
+    if (!existingDeviceId && (lic.status === 'active' || lic.status === 'used')) {
       const { data: updated, error: updErr } = await supabase
         .from<LicenseRow>('licenses')
-        .update({ system_serial: deviceId, hardware_id: deviceId }) // Update both for backward compatibility
+        .update({ 
+          system_serial: deviceId,
+          status: 'used',
+          activated_at: lic.activated_at || new Date().toISOString()
+        })
         .eq('id', lic.id)
         .select()
         .single();
@@ -119,12 +123,12 @@ export default async function handler(req: Request): Promise<Response> {
 }
 
 function toPublic(lic: LicenseRow): ValidateResponse['license'] {
-  const deviceId = lic.system_serial || lic.hardware_id || lic.hwid;
+  const deviceId = lic.system_serial;
   return {
     key: lic.key,
     status: lic.status,
-    hardware_id: deviceId,
-    hwid: deviceId,
+    hardware_id: null, // Deprecated
+    hwid: null, // Deprecated
     system_serial: deviceId,
     activated_at: lic.activated_at,
     expires_at: lic.expires_at,
