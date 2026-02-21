@@ -8,7 +8,6 @@ interface License {
   key: string;
   status: 'active' | 'used' | 'revoked';
   type: 'lifetime' | 'subscription' | 'trial';
-  hardware_id: string | null;
   system_serial: string | null;
   machine_id: string | null;
   created_at: string;
@@ -21,7 +20,6 @@ interface Activation {
   license_id: string | null;
   license_key: string | null;
   system_serial: string | null;
-  hwid: string | null;
   device_model: string | null;
   status: string | null;
   activated_at: string | null;
@@ -241,7 +239,7 @@ export default function Licenses() {
       if (!ok) return;
       const { data, error } = await (supabase
         .from('licenses') as any)
-        .update({ status: 'revoked', system_serial: null, hardware_id: null, hwid: null, activated_at: null, machine_id: null })
+        .update({ status: 'revoked', system_serial: null, activated_at: null, machine_id: null })
         .eq('id', licenseId)
         .select()
         .single();
@@ -592,7 +590,6 @@ export default function Licenses() {
                     const matchesQuery = !q || [
                       a.license_key || '',
                       a.system_serial || '',
-                      a.hwid || '',
                       a.device_model || ''
                     ].some(v => v.toLowerCase().includes(q));
                     const matchesModel = activationModel === 'all' || (a.device_model || '') === activationModel;
@@ -619,7 +616,7 @@ export default function Licenses() {
                           <p className="flex items-center">
                             <span className="font-medium mr-2">System Serial:</span>
                             <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">
-                              {a.system_serial || a.hwid || 'N/A'}
+                              {a.system_serial || 'N/A'}
                             </code>
                           </p>
                           <p className="mt-1 flex items-center">

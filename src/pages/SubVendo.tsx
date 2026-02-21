@@ -5,7 +5,6 @@ import { Key, Plus, Copy, Check, Loader2, ShieldCheck, Server } from 'lucide-rea
 
 interface SubVendoLicense {
   key: string;
-  hardware_id: string | null;
   system_serial: string | null;
   status: 'unused' | 'active' | 'revoked';
   activated_at: string | null;
@@ -117,7 +116,7 @@ export default function SubVendo() {
       if (!ok) return;
       const { data, error } = await (supabase
         .from('sub_vendo_licenses') as any)
-        .update({ status: 'revoked', system_serial: null, hardware_id: null, hwid: null, activated_at: null })
+        .update({ status: 'revoked', system_serial: null, activated_at: null })
         .eq('key', key)
         .select()
         .single();
@@ -156,7 +155,7 @@ export default function SubVendo() {
       if (!ok) return;
       const { data, error } = await (supabase
         .from('sub_vendo_licenses') as any)
-        .update({ system_serial: null, hardware_id: null, activated_at: null, status: 'unused' })
+        .update({ system_serial: null, activated_at: null, status: 'unused' })
         .eq('key', key)
         .select()
         .single();
