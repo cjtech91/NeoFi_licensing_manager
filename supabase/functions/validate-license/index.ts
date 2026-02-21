@@ -15,7 +15,8 @@ type LicenseRow = {
 
 type ValidateRequest = {
   key: string;
-  system_serial: string;
+  system_serial?: string;
+  hwid?: string;
   device_model?: string;
 };
 
@@ -23,7 +24,15 @@ type ValidateResponse = {
   allowed: boolean;
   status: 'active' | 'used' | 'revoked' | 'not_found' | 'expired' | 'mismatch';
   message: string;
-  license?: Pick<LicenseRow, 'key' | 'status' | 'hardware_id' | 'activated_at' | 'expires_at'>;
+  license?: {
+    key: string;
+    status: 'active' | 'used' | 'revoked' | 'trial' | 'lifetime' | 'subscription';
+    hardware_id: string | null;
+    hwid: string | null;
+    system_serial: string | null;
+    activated_at: string | null;
+    expires_at: string | null;
+  };
 };
 
 const corsHeaders = {
@@ -42,8 +51,10 @@ export default async function handler(req: Request): Promise<Response> {
 
   try {
     const body = (await req.json()) as ValidateRequest;
-    if (!body?.key || !body?.system_serial) {
-      return json({ allowed: false, status: 'not_found', message: 'Missing key or system_serial' }, 400);
+    const deviceId = body.system_serial || body.hwid;
+
+    if (!body?.key || !deviceId) {
+      return json({ allowed: false, status: 'not_found', message: 'Missing key or device ID (system_serial/hwid)' }, 400);
     }
 
     const { data: lic, error } = await supabase
@@ -58,57 +69,59 @@ export default async function handler(req: Request): Promise<Response> {
 
     // Expiration check
     if (lic.expires_at && new Date(lic.expires_at).getTime() < Date.now()) {
-      await logValidation(supabase, lic.id, body.system_serial, false, 'expired', 'License is expired', body.device_model, req);
+      await logValidation(supabase, lic.id, deviceId, false, 'expired', 'License is expired', body.device_model, req);
       return json({ allowed: false, status: 'expired', message: 'License is expired', license: toPublic(lic) }, 403);
     }
 
     // Revocation check
     if (lic.status === 'revoked') {
-      await logValidation(supabase, lic.id, body.system_serial, false, 'revoked', 'License revoked', body.device_model, req);
+      await logValidation(supabase, lic.id, deviceId, false, 'revoked', 'License revoked', body.device_model, req);
       return json({ allowed: false, status: 'revoked', message: 'License revoked', license: toPublic(lic) }, 403);
     }
 
     // Mismatch check
-    if (lic.hardware_id && lic.hardware_id !== body.system_serial) {
-      await logValidation(supabase, lic.id, body.system_serial, false, 'mismatch', 'License bound to a different device', body.device_model, req);
+    if (lic.hardware_id && lic.hardware_id !== deviceId) {
+      await logValidation(supabase, lic.id, deviceId, false, 'mismatch', 'License bound to a different device', body.device_model, req);
       return json({ allowed: false, status: 'mismatch', message: 'License bound to a different device', license: toPublic(lic) }, 409);
     }
 
-    // First activation path: bind System Serial, DB trigger marks used + activated_at
+    // First activation path: bind deviceId, DB trigger marks used + activated_at
     if (!lic.hardware_id && lic.status === 'active') {
       const { data: updated, error: updErr } = await supabase
         .from<LicenseRow>('licenses')
-        .update({ hardware_id: body.system_serial })
+        .update({ hardware_id: deviceId })
         .eq('id', lic.id)
         .select()
         .single();
 
       if (updErr?.code === '23505') {
-        await logValidation(supabase, lic.id, body.system_serial, false, 'mismatch', 'System Serial already bound to another license', body.device_model, req);
-        return json({ allowed: false, status: 'mismatch', message: 'System Serial already bound to another license', license: toPublic(lic) }, 409);
+        await logValidation(supabase, lic.id, deviceId, false, 'mismatch', 'Device ID already bound to another license', body.device_model, req);
+        return json({ allowed: false, status: 'mismatch', message: 'Device ID already bound to another license', license: toPublic(lic) }, 409);
       }
 
       if (updErr || !updated) {
-        await logValidation(supabase, lic.id, body.system_serial, false, 'not_found', 'Failed to bind System Serial', body.device_model, req);
-        return json({ allowed: false, status: 'not_found', message: 'Failed to bind System Serial', license: toPublic(lic) }, 500);
+        await logValidation(supabase, lic.id, deviceId, false, 'not_found', 'Failed to bind device', body.device_model, req);
+        return json({ allowed: false, status: 'not_found', message: 'Failed to bind device', license: toPublic(lic) }, 500);
       }
 
-      await logValidation(supabase, updated.id, body.system_serial, true, updated.status, 'License activated and bound to device', body.device_model, req);
+      await logValidation(supabase, updated.id, deviceId, true, updated.status, 'License activated and bound to device', body.device_model, req);
       return json({ allowed: true, status: updated.status, message: 'License activated and bound to device', license: toPublic(updated) });
     }
 
-    await logValidation(supabase, lic.id, body.system_serial, true, lic.status, 'License valid', body.device_model, req);
+    await logValidation(supabase, lic.id, deviceId, true, lic.status, 'License valid', body.device_model, req);
     return json({ allowed: true, status: lic.status, message: 'License valid', license: toPublic(lic) });
   } catch {
     return json({ allowed: false, status: 'not_found', message: 'Unexpected error' }, 500);
   }
 }
 
-function toPublic(lic: LicenseRow): Pick<LicenseRow, 'key' | 'status' | 'hardware_id' | 'activated_at' | 'expires_at'> {
+function toPublic(lic: LicenseRow): ValidateResponse['license'] {
   return {
     key: lic.key,
     status: lic.status,
     hardware_id: lic.hardware_id,
+    hwid: lic.hardware_id,
+    system_serial: lic.hardware_id,
     activated_at: lic.activated_at,
     expires_at: lic.expires_at,
   };
