@@ -23,6 +23,7 @@ export default function Licenses() {
   const [newLicenseType, setNewLicenseType] = useState<'lifetime' | 'subscription' | 'trial'>('lifetime');
   const [newLicenseQty, setNewLicenseQty] = useState<number>(1);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   useEffect(() => {
     fetchLicenses();
@@ -43,6 +44,34 @@ export default function Licenses() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearchLicenses = async () => {
+    try {
+      setLoading(true);
+      const q = searchQuery.trim();
+      if (!q) {
+        await fetchLicenses();
+        return;
+      }
+      const { data, error } = await supabase
+        .from('licenses')
+        .select('*')
+        .or(`key.ilike.%${q}%,hardware_id.ilike.%${q}%`)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setLicenses(data || []);
+    } catch (error) {
+      console.error('Error searching licenses:', error);
+      alert('Failed to search licenses');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearSearchLicenses = async () => {
+    setSearchQuery('');
+    await fetchLicenses();
   };
 
   const generateLicenseKey = () => {
@@ -222,7 +251,25 @@ export default function Licenses() {
             Generate and manage software licenses for your machines.
           </p>
         </div>
-        <div className="mt-4 sm:mt-0">
+        <div className="mt-4 sm:mt-0 flex items-center gap-2">
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by key or serial"
+            className="inline-flex px-3 py-2 border border-gray-300 text-sm rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          <button
+            onClick={handleSearchLicenses}
+            className="inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Search
+          </button>
+          <button
+            onClick={clearSearchLicenses}
+            className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Clear
+          </button>
           <button
             onClick={() => setShowModal(true)}
             className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
