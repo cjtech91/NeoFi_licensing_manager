@@ -53,11 +53,10 @@ export default async function handler(req: Request): Promise<Response> {
 
   try {
     const body = (await req.json()) as ValidateRequest;
-    // Accept system_serial or hwid (for backward compatibility with older clients)
-    const deviceId = body.system_serial || body.hwid;
+    const deviceId = body.system_serial;
 
     if (!deviceId) {
-      return json({ allowed: false, status: 'not_found', message: 'Missing device ID (system_serial)' }, 400);
+      return json({ allowed: false, status: 'not_found', message: 'Missing system_serial' }, 400);
     }
 
     let lic: LicenseRow | null = null;
@@ -73,14 +72,13 @@ export default async function handler(req: Request): Promise<Response> {
       lic = result.data;
       error = result.error;
     } 
-    // Scenario B: No key provided, try to restore/validate by Device ID (Auto-login)
+    // Scenario B: No key provided, restore/validate by system_serial
     else {
-      // Find a valid license bound to this device
       const result = await supabase
         .from<LicenseRow>('licenses')
         .select('*')
         .eq('system_serial', deviceId)
-        .in('status', ['active', 'used']) // Only find valid licenses
+        .in('status', ['active', 'used'])
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -104,21 +102,19 @@ export default async function handler(req: Request): Promise<Response> {
       return json({ allowed: false, status: 'revoked', message: 'License revoked', license: toPublic(lic) }, 403);
     }
 
-    // Mismatch check (Only if validating a specific key that is already bound)
     const existingDeviceId = lic.system_serial;
-    if (existingDeviceId && existingDeviceId !== deviceId) {
+    const hasBinding = !!existingDeviceId;
+    if (hasBinding && existingDeviceId !== deviceId) {
       await logValidation(supabase, lic.id, deviceId, false, 'mismatch', 'License bound to a different device', body.device_model, req);
       return json({ allowed: false, status: 'mismatch', message: 'License bound to a different device', license: toPublic(lic) }, 409);
     }
 
     // First activation path: bind deviceId
-    if (!existingDeviceId && (lic.status === 'active' || lic.status === 'used')) {
+    if (!hasBinding && (lic.status === 'active' || lic.status === 'used')) {
       const { data: updated, error: updErr } = await supabase
         .from<LicenseRow>('licenses')
         .update({ 
           system_serial: deviceId,
-          hardware_id: deviceId, // Sync for backward compatibility and triggers
-          hwid: deviceId,        // Sync for backward compatibility
           status: 'used',
           activated_at: lic.activated_at || new Date().toISOString()
         })
@@ -141,7 +137,7 @@ export default async function handler(req: Request): Promise<Response> {
         license_id: updated.id,
         license_key: updated.key,
         system_serial: deviceId,
-        hwid: deviceId,
+        hwid: null,
         device_model: body.device_model || null,
         status: updated.status,
         activated_at: updated.activated_at,
@@ -159,13 +155,12 @@ export default async function handler(req: Request): Promise<Response> {
 }
 
 function toPublic(lic: LicenseRow): ValidateResponse['license'] {
-  // Use system_serial as the primary source of truth, fallback to others
-  const deviceId = lic.system_serial || lic.hwid || lic.hardware_id;
+  const deviceId = lic.system_serial;
   return {
     key: lic.key,
     status: lic.status,
-    hardware_id: deviceId, // Populate for backward compatibility with older clients
-    hwid: deviceId,        // Populate for backward compatibility with older clients
+    hardware_id: null,
+    hwid: null,
     system_serial: deviceId,
     activated_at: lic.activated_at,
     expires_at: lic.expires_at,
