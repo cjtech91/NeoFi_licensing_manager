@@ -306,9 +306,9 @@ export default function Licenses() {
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Active Licenses</dt>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Active (Bound)</dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {licenses.filter(l => l.status === 'active' || l.status === 'revoked').length}
+                    {licenses.filter(l => l.system_serial !== null || l.status === 'used').length}
                   </dd>
                 </dl>
               </div>
@@ -323,9 +323,9 @@ export default function Licenses() {
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Used Licenses</dt>
+                  <dt className="text-sm font-medium text-gray-500 truncate">Unused Licenses</dt>
                   <dd className="text-lg font-medium text-gray-900">
-                    {licenses.filter(l => l.hardware_id !== null || l.activated_at !== null || l.status === 'used').length}
+                    {licenses.filter(l => l.status === 'active' && !l.system_serial).length}
                   </dd>
                 </dl>
               </div>
@@ -343,18 +343,18 @@ export default function Licenses() {
         </div>
       ) : (
         <div className="space-y-8">
-          {/* Available Licenses */}
+          {/* Unused Licenses */}
           <div className="bg-white shadow overflow-hidden sm:rounded-lg">
             <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-              <h3 className="text-lg leading-6 font-medium text-gray-900">Available Licenses</h3>
+              <h3 className="text-lg leading-6 font-medium text-gray-900">Unused Licenses</h3>
             </div>
-            {licenses.filter(l => (l.status === 'active' && !l.system_serial) || l.status === 'revoked').length === 0 ? (
+            {licenses.filter(l => l.status === 'active' && !l.system_serial).length === 0 ? (
               <div className="p-12 text-center text-gray-500">
-                No available licenses found. Generate one to get started.
+                No unused licenses found. Generate one to get started.
               </div>
             ) : (
               <ul className="divide-y divide-gray-200">
-                {licenses.filter(l => (l.status === 'active' && !l.system_serial) || l.status === 'revoked').map((license) => (
+                {licenses.filter(l => l.status === 'active' && !l.system_serial).map((license) => (
                   <li key={license.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
@@ -374,11 +374,11 @@ export default function Licenses() {
                             )}
                           </button>
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            (license.status === 'active' || license.status === 'revoked') ? 'bg-green-100 text-green-800' :
+                            (!license.system_serial && license.status === 'active') ? 'bg-green-100 text-green-800' :
                             license.status === 'used' ? 'bg-blue-100 text-blue-800' :
                             'bg-gray-100 text-gray-800'
                           }`}>
-                            {license.status === 'revoked' ? 'available' : license.status}
+                            {!license.system_serial && license.status === 'active' ? 'unused' : license.status}
                           </span>
                           <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
                             {license.type}
@@ -432,13 +432,13 @@ export default function Licenses() {
             <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
               <h3 className="text-lg leading-6 font-medium text-gray-900">Active Bound Licenses</h3>
             </div>
-            {licenses.filter(l => l.hardware_id !== null || l.activated_at !== null || l.status === 'used').length === 0 ? (
+            {licenses.filter(l => l.system_serial !== null || l.status === 'used').length === 0 ? (
               <div className="p-12 text-center text-gray-500">
                 No active bound licenses found.
               </div>
             ) : (
               <ul className="divide-y divide-gray-200">
-                {licenses.filter(l => l.hardware_id !== null || l.activated_at !== null || l.status === 'used').map((license) => (
+                {licenses.filter(l => l.system_serial !== null || l.status === 'used').map((license) => (
                   <li key={license.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
