@@ -512,6 +512,14 @@ export default function Licenses() {
                           >
                             Revoke
                           </button>
+                          {license.system_serial && (
+                            <button
+                              onClick={() => handleUnbindHardware(license.id)}
+                              className="ml-2 px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                            >
+                              Unbind Serial
+                            </button>
+                          )}
                         </div>
                         <div className="mt-2 text-sm text-gray-500">
                           <p className="flex items-center">
