@@ -407,90 +407,91 @@ export default function Licenses() {
                 No unused / revoked licenses found. Generate one to get started.
               </div>
             ) : (
-              <ul className="divide-y divide-gray-200">
-                {licenses
-                  .filter(l => (l.status === 'active' && !l.system_serial) || l.status === 'revoked')
-                  .map((license) => (
-                  <li key={license.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-3">
-                          <p className="text-sm font-medium text-blue-600 truncate font-mono">
-                            {license.key}
-                          </p>
-                          <button
-                            onClick={() => copyToClipboard(license.key)}
-                            className="text-gray-400 hover:text-gray-600 transition-colors"
-                            title="Copy to clipboard"
-                          >
-                            {copySuccess === license.key ? (
-                              <Check className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
-                          </button>
-                          <span
-                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              license.status === 'revoked'
-                                ? 'bg-red-100 text-red-800'
-                                : (!license.system_serial && license.status === 'active')
-                                  ? 'bg-green-100 text-green-800'
-                                  : license.status === 'used'
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : 'bg-gray-100 text-gray-800'
-                            }`}
-                          >
-                            {!license.system_serial && license.status === 'active' ? 'unused' : license.status}
-                          </span>
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                            {license.type}
-                          </span>
-                          {/* Revoke button removed for Unused / Revoked list */}
-                          {license.status !== 'revoked' && (
+              <div className="h-96 overflow-y-auto">
+                <ul className="divide-y divide-gray-200">
+                  {licenses
+                    .filter(l => (l.status === 'active' && !l.system_serial) || l.status === 'revoked')
+                    .map((license) => (
+                    <li key={license.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-3">
+                            <p className="text-sm font-medium text-blue-600 truncate font-mono">
+                              {license.key}
+                            </p>
                             <button
-                              onClick={() => handleBindHardware(license.id)}
-                              className="ml-2 px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                              onClick={() => copyToClipboard(license.key)}
+                              className="text-gray-400 hover:text-gray-600 transition-colors"
+                              title="Copy to clipboard"
                             >
-                              Bind Serial
+                              {copySuccess === license.key ? (
+                                <Check className="h-4 w-4 text-green-500" />
+                              ) : (
+                                <Copy className="h-4 w-4" />
+                              )}
                             </button>
-                          )}
-                          {license.status !== 'revoked' && license.system_serial && (
-                            <button
-                              onClick={() => handleUnbindHardware(license.id)}
-                              className="ml-2 px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                            <span
+                              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                license.status === 'revoked'
+                                  ? 'bg-red-100 text-red-800'
+                                  : (!license.system_serial && license.status === 'active')
+                                    ? 'bg-green-100 text-green-800'
+                                    : license.status === 'used'
+                                      ? 'bg-blue-100 text-blue-800'
+                                      : 'bg-gray-100 text-gray-800'
+                              }`}
                             >
-                              Unbind Serial
-                            </button>
-                          )}
-                          {license.status === 'revoked' && (
-                            <button
-                              onClick={() => handleUnbindHardware(license.id)}
-                              className="ml-2 px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
-                            >
-                              Unbind Serial
-                            </button>
-                          )}
-                        </div>
-                        <div className="mt-2 flex">
-                          <div className="flex items-center text-sm text-gray-500">
-                            <span className="truncate">
-                              {license.system_serial ? `Bound to: ${license.system_serial}` : 'Not activated yet'}
+                              {!license.system_serial && license.status === 'active' ? 'unused' : license.status}
                             </span>
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                              {license.type}
+                            </span>
+                            {license.status !== 'revoked' && (
+                              <button
+                                onClick={() => handleBindHardware(license.id)}
+                                className="ml-2 px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                              >
+                                Bind Serial
+                              </button>
+                            )}
+                            {license.status !== 'revoked' && license.system_serial && (
+                              <button
+                                onClick={() => handleUnbindHardware(license.id)}
+                                className="ml-2 px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                              >
+                                Unbind Serial
+                              </button>
+                            )}
+                            {license.status === 'revoked' && (
+                              <button
+                                onClick={() => handleUnbindHardware(license.id)}
+                                className="ml-2 px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                              >
+                                Unbind Serial
+                              </button>
+                            )}
+                          </div>
+                          <div className="mt-2 flex">
+                            <div className="flex items-center text-sm text-gray-500">
+                              <span className="truncate">
+                                {license.system_serial ? `Bound to: ${license.system_serial}` : 'Not activated yet'}
+                              </span>
+                            </div>
                           </div>
                         </div>
+                        <div className="flex flex-col items-end text-sm text-gray-500">
+                          <span>Created: {new Date(license.created_at).toLocaleDateString()}</span>
+                          {license.activated_at && (
+                            <span className="text-xs text-gray-400">
+                              Activated: {new Date(license.activated_at).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex flex-col items-end text-sm text-gray-500">
-                        <span>Created: {new Date(license.created_at).toLocaleDateString()}</span>
-                        {license.activated_at && (
-                          <span className="text-xs text-gray-400">
-                            Activated: {new Date(license.activated_at).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
 
