@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Key, Plus, Copy, Check, Loader2, ShieldCheck, Server } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 interface SubVendoLicense {
   key: string;
@@ -13,6 +14,7 @@ interface SubVendoLicense {
 
 export default function SubVendo() {
   const { session } = useAuth();
+  const { show } = useToast();
   const [licenses, setLicenses] = useState<SubVendoLicense[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -20,7 +22,6 @@ export default function SubVendo() {
   const [newLicenseQty, setNewLicenseQty] = useState<number>(1);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     fetchLicenses();
@@ -123,12 +124,10 @@ export default function SubVendo() {
         .single();
       if (error) throw error;
       setLicenses(licenses.map(l => (l.key === key ? data : l)));
-      setToast({ message: 'License revoked successfully', type: 'success' });
-      setTimeout(() => setToast(null), 3000);
+      show('License revoked successfully', 'success');
     } catch (e) {
       console.error('Error revoking license:', e);
-      setToast({ message: 'Failed to revoke license', type: 'error' });
-      setTimeout(() => setToast(null), 3000);
+      show('Failed to revoke license', 'error');
     }
   };
 
@@ -145,12 +144,10 @@ export default function SubVendo() {
         .single();
       if (error) throw error;
       setLicenses(licenses.map(l => (l.key === key ? data : l)));
-      setToast({ message: 'License bound to System Serial successfully', type: 'success' });
-      setTimeout(() => setToast(null), 3000);
+      show('License bound to System Serial successfully', 'success');
     } catch (e) {
       console.error('Error binding System Serial:', e);
-      setToast({ message: 'Failed to bind System Serial', type: 'error' });
-      setTimeout(() => setToast(null), 3000);
+      show('Failed to bind System Serial', 'error');
     }
   };
 
@@ -175,12 +172,10 @@ export default function SubVendo() {
         .single();
       if (error) throw error;
       setLicenses(licenses.map(l => (l.key === key ? data : l)));
-      setToast({ message: 'Serial unbound. License is reusable.', type: 'success' });
-      setTimeout(() => setToast(null), 3000);
+      show('Serial unbound. License is reusable.', 'success');
     } catch (e) {
       console.error('Error unbinding System Serial:', e);
-      setToast({ message: 'Failed to unbind System Serial', type: 'error' });
-      setTimeout(() => setToast(null), 3000);
+      show('Failed to unbind System Serial', 'error');
     }
   };
 
@@ -192,11 +187,6 @@ export default function SubVendo() {
 
   return (
     <div className="space-y-6">
-      {toast && (
-        <div className={`fixed bottom-4 right-4 px-4 py-2 rounded shadow text-sm ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
-          {toast.message}
-        </div>
-      )}
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Sub Vendo Licenses</h1>

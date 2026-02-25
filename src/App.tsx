@@ -11,6 +11,7 @@ import Licenses from './pages/Licenses';
 import SubVendo from './pages/SubVendo';
 import Reports from './pages/Reports';
 import Layout from './components/Layout';
+import { ToastProvider } from './context/ToastContext';
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -35,24 +36,26 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          
-          <Route path="/*" element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }>
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="vouchers" element={<Vouchers />} />
-            <Route path="machines" element={<Machines />} />
-            <Route path="licenses" element={<Licenses />} />
-            <Route path="sub-vendo" element={<SubVendo />} />
-            <Route path="reports" element={<Reports />} />
-          </Route>
-        </Routes>
+        <ToastProvider>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            
+            <Route path="/*" element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }>
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="vouchers" element={<Vouchers />} />
+              <Route path="machines" element={<Machines />} />
+              <Route path="licenses" element={<Licenses />} />
+              <Route path="sub-vendo" element={<SubVendo />} />
+              <Route path="reports" element={<Reports />} />
+            </Route>
+          </Routes>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   );

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Key, Plus, Copy, Check, RefreshCw, Loader2, ShieldCheck } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 interface License {
   id: string;
@@ -28,6 +29,7 @@ interface Activation {
 
 export default function Licenses() {
   const { session } = useAuth();
+  const { show } = useToast();
   const [licenses, setLicenses] = useState<License[]>([]);
   const [activations, setActivations] = useState<Activation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +42,6 @@ export default function Licenses() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activationSearch, setActivationSearch] = useState<string>('');
   const [activationModel, setActivationModel] = useState<string>('all');
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     fetchLicenses();
@@ -246,12 +247,10 @@ export default function Licenses() {
         .single();
       if (error) throw error;
       setLicenses(licenses.map(l => (l.id === licenseId ? data : l)));
-      setToast({ message: 'License revoked successfully', type: 'success' });
-      setTimeout(() => setToast(null), 3000);
+      show('License revoked successfully', 'success');
     } catch (e) {
       console.error('Error revoking license:', e);
-      setToast({ message: 'Failed to revoke license', type: 'error' });
-      setTimeout(() => setToast(null), 3000);
+      show('Failed to revoke license', 'error');
     }
   };
 
@@ -302,22 +301,15 @@ export default function Licenses() {
         .single();
       if (error) throw error;
       setLicenses(licenses.map(l => (l.id === licenseId ? data : l)));
-      setToast({ message: 'Serial unbound. License is reusable.', type: 'success' });
-      setTimeout(() => setToast(null), 3000);
+      show('Serial unbound. License is reusable.', 'success');
     } catch (e) {
       console.error('Error unbinding System Serial:', e);
-      setToast({ message: 'Failed to unbind System Serial', type: 'error' });
-      setTimeout(() => setToast(null), 3000);
+      show('Failed to unbind System Serial', 'error');
     }
   };
 
   return (
     <div className="space-y-6">
-      {toast && (
-        <div className={`fixed bottom-4 right-4 px-4 py-2 rounded shadow text-sm ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
-          {toast.message}
-        </div>
-      )}
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">License Management</h1>
