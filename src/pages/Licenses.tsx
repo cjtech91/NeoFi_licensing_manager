@@ -505,65 +505,67 @@ export default function Licenses() {
                 No active bound licenses found.
               </div>
             ) : (
-              <ul className="divide-y divide-gray-200">
-                {licenses.filter(l => (l.system_serial !== null || l.status === 'used') && l.status !== 'revoked').map((license) => (
-                  <li key={license.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <p className="text-sm font-medium text-blue-600 truncate font-mono">
-                            {license.key}
-                          </p>
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                            {license.status}
-                          </span>
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                            {license.type}
-                          </span>
-                          <button
-                            onClick={() => handleRevokeLicense(license.id)}
-                            className="ml-2 px-2 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200"
-                          >
-                            Revoke
-                          </button>
-                          {license.system_serial && (
+              <div className="h-96 overflow-y-auto">
+                <ul className="divide-y divide-gray-200">
+                  {licenses.filter(l => (l.system_serial !== null || l.status === 'used') && l.status !== 'revoked').map((license) => (
+                    <li key={license.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <p className="text-sm font-medium text-blue-600 truncate font-mono">
+                              {license.key}
+                            </p>
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                              {license.status}
+                            </span>
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                              {license.type}
+                            </span>
                             <button
-                              onClick={() => handleUnbindHardware(license.id)}
-                              className="ml-2 px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                              onClick={() => handleRevokeLicense(license.id)}
+                              className="ml-2 px-2 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200"
                             >
-                              Unbind Serial
+                              Revoke
                             </button>
+                            {license.system_serial && (
+                              <button
+                                onClick={() => handleUnbindHardware(license.id)}
+                                className="ml-2 px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                              >
+                                Unbind Serial
+                              </button>
+                            )}
+                          </div>
+                          <div className="mt-2 text-sm text-gray-500">
+                            <p className="flex items-center">
+                              <span className="font-medium mr-2">System Serial:</span>
+                              <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">
+                                {license.system_serial || 'N/A'}
+                              </code>
+                            </p>
+                            <p className="mt-1 flex items-center">
+                              <span className="font-medium mr-2">Activated:</span>
+                              <span>
+                                {license.activated_at 
+                                  ? new Date(license.activated_at).toLocaleString() 
+                                  : 'N/A'}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end text-sm text-gray-500">
+                          <span>Created: {new Date(license.created_at).toLocaleDateString()}</span>
+                          {license.machine_id && (
+                            <span className="text-xs text-gray-400 mt-1">
+                              Machine ID: {license.machine_id}
+                            </span>
                           )}
                         </div>
-                        <div className="mt-2 text-sm text-gray-500">
-                          <p className="flex items-center">
-                            <span className="font-medium mr-2">System Serial:</span>
-                            <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">
-                              {license.system_serial || 'N/A'}
-                            </code>
-                          </p>
-                          <p className="mt-1 flex items-center">
-                            <span className="font-medium mr-2">Activated:</span>
-                            <span>
-                              {license.activated_at 
-                                ? new Date(license.activated_at).toLocaleString() 
-                                : 'N/A'}
-                            </span>
-                          </p>
-                        </div>
                       </div>
-                      <div className="flex flex-col items-end text-sm text-gray-500">
-                        <span>Created: {new Date(license.created_at).toLocaleDateString()}</span>
-                        {license.machine_id && (
-                          <span className="text-xs text-gray-400 mt-1">
-                            Machine ID: {license.machine_id}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
           
@@ -607,63 +609,65 @@ export default function Licenses() {
                 No activations recorded yet.
               </div>
             ) : (
-              <ul className="divide-y divide-gray-200">
-                {activations
-                  .filter((a) => {
-                    const q = activationSearch.trim().toLowerCase();
-                    const matchesQuery = !q || [
-                      a.license_key || '',
-                      a.system_serial || '',
-                      a.device_model || ''
-                    ].some(v => v.toLowerCase().includes(q));
-                    const matchesModel = activationModel === 'all' || (a.device_model || '') === activationModel;
-                    return matchesQuery && matchesModel;
-                  })
-                  .map((a) => (
-                  <li key={a.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <p className="text-sm font-medium text-blue-600 truncate font-mono">
-                            {a.license_key || 'N/A'}
-                          </p>
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            a.status === 'used' ? 'bg-blue-100 text-blue-800' :
-                            a.status === 'active' ? 'bg-green-100 text-green-800' :
-                            a.status === 'revoked' ? 'bg-red-100 text-red-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {a.status || 'unknown'}
-                          </span>
-                        </div>
-                        <div className="mt-1 text-sm text-gray-500">
-                          <p className="flex items-center">
-                            <span className="font-medium mr-2">System Serial:</span>
-                            <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">
-                              {a.system_serial || 'N/A'}
-                            </code>
-                          </p>
-                          <p className="mt-1 flex items-center">
-                            <span className="font-medium mr-2">Device Model:</span>
-                            <span>{a.device_model || 'N/A'}</span>
-                          </p>
-                          <p className="mt-1 flex items-center">
-                            <span className="font-medium mr-2">Activated:</span>
-                            <span>
-                              {a.activated_at 
-                                ? new Date(a.activated_at).toLocaleString() 
-                                : (a.created_at ? new Date(a.created_at).toLocaleString() : 'N/A')}
+              <div className="h-96 overflow-y-auto">
+                <ul className="divide-y divide-gray-200">
+                  {activations
+                    .filter((a) => {
+                      const q = activationSearch.trim().toLowerCase();
+                      const matchesQuery = !q || [
+                        a.license_key || '',
+                        a.system_serial || '',
+                        a.device_model || ''
+                      ].some(v => v.toLowerCase().includes(q));
+                      const matchesModel = activationModel === 'all' || (a.device_model || '') === activationModel;
+                      return matchesQuery && matchesModel;
+                    })
+                    .map((a) => (
+                    <li key={a.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <p className="text-sm font-medium text-blue-600 truncate font-mono">
+                              {a.license_key || 'N/A'}
+                            </p>
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              a.status === 'used' ? 'bg-blue-100 text-blue-800' :
+                              a.status === 'active' ? 'bg-green-100 text-green-800' :
+                              a.status === 'revoked' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {a.status || 'unknown'}
                             </span>
-                          </p>
-                          {a.message && (
-                            <p className="mt-1 text-xs text-gray-400">{a.message}</p>
-                          )}
+                          </div>
+                          <div className="mt-1 text-sm text-gray-500">
+                            <p className="flex items-center">
+                              <span className="font-medium mr-2">System Serial:</span>
+                              <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">
+                                {a.system_serial || 'N/A'}
+                              </code>
+                            </p>
+                            <p className="mt-1 flex items-center">
+                              <span className="font-medium mr-2">Device Model:</span>
+                              <span>{a.device_model || 'N/A'}</span>
+                            </p>
+                            <p className="mt-1 flex items-center">
+                              <span className="font-medium mr-2">Activated:</span>
+                              <span>
+                                {a.activated_at 
+                                  ? new Date(a.activated_at).toLocaleString() 
+                                  : (a.created_at ? new Date(a.created_at).toLocaleString() : 'N/A')}
+                              </span>
+                            </p>
+                            {a.message && (
+                              <p className="mt-1 text-xs text-gray-400">{a.message}</p>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         </div>

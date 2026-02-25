@@ -283,47 +283,49 @@ export default function SubVendo() {
                 No unused licenses found. Generate one to get started.
               </div>
             ) : (
-              <ul className="divide-y divide-gray-200">
-                {licenses.filter(l => l.status === 'unused' || l.status === 'revoked').map((license) => (
-                  <li key={license.key} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-3">
-                          <p className="text-sm font-medium text-indigo-600 truncate font-mono">
-                            {license.key}
-                          </p>
-                          <button
-                            onClick={() => copyToClipboard(license.key)}
-                            className="text-gray-400 hover:text-gray-600 transition-colors"
-                            title="Copy to clipboard"
-                          >
-                            {copySuccess === license.key ? (
-                              <Check className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
-                          </button>
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            license.status === 'unused' ? 'bg-green-100 text-green-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {license.status}
-                          </span>
-                          <button
-                            onClick={() => handleBindHardware(license.key)}
-                            className="ml-2 px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
-                          >
-                            Bind Serial
-                          </button>
-                        </div>
-                        <div className="mt-2 text-sm text-gray-500">
-                            Created: {new Date(license.created_at).toLocaleDateString()}
+              <div className="h-96 overflow-y-auto">
+                <ul className="divide-y divide-gray-200">
+                  {licenses.filter(l => l.status === 'unused' || l.status === 'revoked').map((license) => (
+                    <li key={license.key} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-3">
+                            <p className="text-sm font-medium text-indigo-600 truncate font-mono">
+                              {license.key}
+                            </p>
+                            <button
+                              onClick={() => copyToClipboard(license.key)}
+                              className="text-gray-400 hover:text-gray-600 transition-colors"
+                              title="Copy to clipboard"
+                            >
+                              {copySuccess === license.key ? (
+                                <Check className="h-4 w-4 text-green-500" />
+                              ) : (
+                                <Copy className="h-4 w-4" />
+                              )}
+                            </button>
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              license.status === 'unused' ? 'bg-green-100 text-green-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {license.status}
+                            </span>
+                            <button
+                              onClick={() => handleBindHardware(license.key)}
+                              className="ml-2 px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                            >
+                              Bind Serial
+                            </button>
+                          </div>
+                          <div className="mt-2 text-sm text-gray-500">
+                              Created: {new Date(license.created_at).toLocaleDateString()}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
 
@@ -337,52 +339,54 @@ export default function SubVendo() {
                 No active licenses found.
               </div>
             ) : (
-              <ul className="divide-y divide-gray-200">
-                {licenses.filter(l => l.status === 'active').map((license) => (
-                  <li key={license.key} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <p className="text-sm font-medium text-indigo-600 truncate font-mono">
-                            {license.key}
-                          </p>
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                            {license.status}
-                          </span>
-                          <button
-                            onClick={() => handleRevokeLicense(license.key)}
-                            className="ml-2 px-2 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200"
-                          >
-                            Revoke
-                          </button>
-                          <button
-                            onClick={() => handleUnbindHardware(license.key)}
-                            className="ml-2 px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
-                          >
-                            Unbind Serial
-                          </button>
-                        </div>
-                        <div className="mt-2 text-sm text-gray-500">
-                          <p className="flex items-center">
-                            <span className="font-medium mr-2">System Serial:</span>
-                            <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">
-                              {license.system_serial || 'N/A'}
-                            </code>
-                          </p>
-                          <p className="mt-1 flex items-center">
-                            <span className="font-medium mr-2">Activated:</span>
-                            <span>
-                              {license.activated_at 
-                                ? new Date(license.activated_at).toLocaleString() 
-                                : 'N/A'}
+              <div className="h-96 overflow-y-auto">
+                <ul className="divide-y divide-gray-200">
+                  {licenses.filter(l => l.status === 'active').map((license) => (
+                    <li key={license.key} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <p className="text-sm font-medium text-indigo-600 truncate font-mono">
+                              {license.key}
+                            </p>
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                              {license.status}
                             </span>
-                          </p>
+                            <button
+                              onClick={() => handleRevokeLicense(license.key)}
+                              className="ml-2 px-2 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200"
+                            >
+                              Revoke
+                            </button>
+                            <button
+                              onClick={() => handleUnbindHardware(license.key)}
+                              className="ml-2 px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                            >
+                              Unbind Serial
+                            </button>
+                          </div>
+                          <div className="mt-2 text-sm text-gray-500">
+                            <p className="flex items-center">
+                              <span className="font-medium mr-2">System Serial:</span>
+                              <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">
+                                {license.system_serial || 'N/A'}
+                              </code>
+                            </p>
+                            <p className="mt-1 flex items-center">
+                              <span className="font-medium mr-2">Activated:</span>
+                              <span>
+                                {license.activated_at 
+                                  ? new Date(license.activated_at).toLocaleString() 
+                                  : 'N/A'}
+                              </span>
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         </div>
