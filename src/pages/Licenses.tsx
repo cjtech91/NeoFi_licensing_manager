@@ -40,6 +40,7 @@ export default function Licenses() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activationSearch, setActivationSearch] = useState<string>('');
   const [activationModel, setActivationModel] = useState<string>('all');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     fetchLicenses();
@@ -245,9 +246,12 @@ export default function Licenses() {
         .single();
       if (error) throw error;
       setLicenses(licenses.map(l => (l.id === licenseId ? data : l)));
+      setToast({ message: 'License revoked successfully', type: 'success' });
+      setTimeout(() => setToast(null), 3000);
     } catch (e) {
       console.error('Error revoking license:', e);
-      alert('Failed to revoke license');
+      setToast({ message: 'Failed to revoke license', type: 'error' });
+      setTimeout(() => setToast(null), 3000);
     }
   };
 
@@ -280,25 +284,40 @@ export default function Licenses() {
   const handleUnbindHardware = async (licenseId: string) => {
     try {
       if (!session?.user?.id) return;
-      const ok = window.confirm('Unbind this license from its System Serial?');
+      const lic = licenses.find(l => l.id === licenseId);
+      const isRevoked = lic?.status === 'revoked';
+      const ok = window.confirm(isRevoked 
+        ? 'This license is revoked. Unbind the serial so the key can be reused?' 
+        : 'Unbind this license from its System Serial?');
       if (!ok) return;
+      if (isRevoked) {
+        const ok2 = window.confirm('Are you sure? The license will remain revoked, only the serial is removed.');
+        if (!ok2) return;
+      }
       const { data, error } = await (supabase
         .from('licenses') as any)
-        .update({ system_serial: null, activated_at: null, machine_id: null })
+        .update({ system_serial: null, activated_at: null, machine_id: null, status: 'active' })
         .eq('id', licenseId)
         .select()
         .single();
       if (error) throw error;
       setLicenses(licenses.map(l => (l.id === licenseId ? data : l)));
-      alert('License unbound successfully');
+      setToast({ message: 'Serial unbound. License is reusable.', type: 'success' });
+      setTimeout(() => setToast(null), 3000);
     } catch (e) {
       console.error('Error unbinding System Serial:', e);
-      alert('Failed to unbind System Serial');
+      setToast({ message: 'Failed to unbind System Serial', type: 'error' });
+      setTimeout(() => setToast(null), 3000);
     }
   };
 
   return (
     <div className="space-y-6">
+      {toast && (
+        <div className={`fixed bottom-4 right-4 px-4 py-2 rounded shadow text-sm ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+          {toast.message}
+        </div>
+      )}
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">License Management</h1>

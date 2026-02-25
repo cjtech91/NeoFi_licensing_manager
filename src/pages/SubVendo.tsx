@@ -20,6 +20,7 @@ export default function SubVendo() {
   const [newLicenseQty, setNewLicenseQty] = useState<number>(1);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     fetchLicenses();
@@ -122,9 +123,12 @@ export default function SubVendo() {
         .single();
       if (error) throw error;
       setLicenses(licenses.map(l => (l.key === key ? data : l)));
+      setToast({ message: 'License revoked successfully', type: 'success' });
+      setTimeout(() => setToast(null), 3000);
     } catch (e) {
       console.error('Error revoking license:', e);
-      alert('Failed to revoke license');
+      setToast({ message: 'Failed to revoke license', type: 'error' });
+      setTimeout(() => setToast(null), 3000);
     }
   };
 
@@ -141,18 +145,28 @@ export default function SubVendo() {
         .single();
       if (error) throw error;
       setLicenses(licenses.map(l => (l.key === key ? data : l)));
-      alert('License bound to System Serial successfully');
+      setToast({ message: 'License bound to System Serial successfully', type: 'success' });
+      setTimeout(() => setToast(null), 3000);
     } catch (e) {
       console.error('Error binding System Serial:', e);
-      alert('Failed to bind System Serial');
+      setToast({ message: 'Failed to bind System Serial', type: 'error' });
+      setTimeout(() => setToast(null), 3000);
     }
   };
 
   const handleUnbindHardware = async (key: string) => {
     try {
       if (!session?.user?.id) return;
-      const ok = window.confirm('Unbind this license from its hardware?');
+      const lic = licenses.find(l => l.key === key);
+      const isRevoked = lic?.status === 'revoked';
+      const ok = window.confirm(isRevoked 
+        ? 'This license is revoked. Unbind the serial so the key can be reused?' 
+        : 'Unbind this license from its hardware?');
       if (!ok) return;
+      if (isRevoked) {
+        const ok2 = window.confirm('Are you sure? The license will remain revoked, only the serial is removed.');
+        if (!ok2) return;
+      }
       const { data, error } = await (supabase
         .from('sub_vendo_licenses') as any)
         .update({ system_serial: null, activated_at: null, status: 'unused' })
@@ -161,10 +175,12 @@ export default function SubVendo() {
         .single();
       if (error) throw error;
       setLicenses(licenses.map(l => (l.key === key ? data : l)));
-      alert('License unbound successfully');
+      setToast({ message: 'Serial unbound. License is reusable.', type: 'success' });
+      setTimeout(() => setToast(null), 3000);
     } catch (e) {
       console.error('Error unbinding System Serial:', e);
-      alert('Failed to unbind System Serial');
+      setToast({ message: 'Failed to unbind System Serial', type: 'error' });
+      setTimeout(() => setToast(null), 3000);
     }
   };
 
@@ -176,6 +192,11 @@ export default function SubVendo() {
 
   return (
     <div className="space-y-6">
+      {toast && (
+        <div className={`fixed bottom-4 right-4 px-4 py-2 rounded shadow text-sm ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+          {toast.message}
+        </div>
+      )}
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Sub Vendo Licenses</h1>
