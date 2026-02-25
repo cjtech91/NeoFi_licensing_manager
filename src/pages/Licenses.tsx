@@ -445,14 +445,7 @@ export default function Licenses() {
                           <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
                             {license.type}
                           </span>
-                          {license.status !== 'revoked' && (
-                            <button
-                              onClick={() => handleRevokeLicense(license.id)}
-                              className="ml-2 px-2 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200"
-                            >
-                              Revoke
-                            </button>
-                          )}
+                          {/* Revoke button removed for Unused / Revoked list */}
                           {license.status !== 'revoked' && (
                             <button
                               onClick={() => handleBindHardware(license.id)}
