@@ -47,7 +47,7 @@ export default function Licenses() {
 
   const applyCloudflareStatus = async (rows: License[]) => {
     try {
-      const keys = Array.from(new Set(rows.map(r => r.key).filter(Boolean)));
+      const keys = Array.from(new Set(rows.map(r => (r.key || '').trim()).filter(Boolean)));
       if (keys.length === 0) return rows;
 
       const res = await fetch('/api/license-status', {
@@ -71,7 +71,8 @@ export default function Licenses() {
       };
 
       return rows.map((r) => {
-        const rec = payload.records?.[r.key];
+        const k = (r.key || '').trim();
+        const rec = payload.records?.[k] ?? payload.records?.[r.key];
         if (!rec) return r;
         const nextStatus = normalizeStatus(rec.status);
         const boundSerial = typeof rec.bound_serial === 'string' && rec.bound_serial.trim().length > 0 ? rec.bound_serial.trim() : null;
