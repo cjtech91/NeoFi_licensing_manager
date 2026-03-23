@@ -10,6 +10,7 @@ import Machines from './pages/Machines';
 import Licenses from './pages/Licenses';
 import SubVendo from './pages/SubVendo';
 import Reports from './pages/Reports';
+import LicenseLogs from './pages/LicenseLogs';
 import Layout from './components/Layout';
 import { ToastProvider } from './context/ToastContext';
 
@@ -51,6 +52,7 @@ function App() {
               <Route path="vouchers" element={<Vouchers />} />
               <Route path="machines" element={<Machines />} />
               <Route path="licenses" element={<Licenses />} />
+              <Route path="license-logs" element={<LicenseLogs />} />
               <Route path="sub-vendo" element={<SubVendo />} />
               <Route path="reports" element={<Reports />} />
             </Route>
