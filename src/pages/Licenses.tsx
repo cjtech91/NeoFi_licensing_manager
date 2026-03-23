@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Key, Plus, Copy, Check, RefreshCw, Loader2, ShieldCheck } from 'lucide-react';
+import { Key, Plus, Copy, Check, RefreshCw, Loader2, ShieldCheck, Trash2 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
 interface License {
@@ -32,6 +32,7 @@ export default function Licenses() {
   const { session } = useAuth();
   const { show } = useToast();
   const [licenses, setLicenses] = useState<License[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activations, setActivations] = useState<Activation[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingActivations, setLoadingActivations] = useState(true);
@@ -101,6 +102,18 @@ export default function Licenses() {
   }, [licenses]);
 
   useEffect(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const keep = new Set(licenses.map((l) => l.id));
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (keep.has(id)) next.add(id);
+      });
+      return next.size === prev.size ? prev : next;
+    });
+  }, [licenses]);
+
+  useEffect(() => {
     let cancelled = false;
     const run = async () => {
       const current = licensesRef.current;
@@ -121,6 +134,68 @@ export default function Licenses() {
       window.clearInterval(id);
     };
   }, []);
+
+  const allSelected = licenses.length > 0 && selectedIds.size === licenses.length;
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+      return;
+    }
+    setSelectedIds(new Set(licenses.map((l) => l.id)));
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const deleteByIds = async (ids: string[]) => {
+    const chunkSize = 100;
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const chunk = ids.slice(i, i + chunkSize);
+      const { error } = await supabase.from('licenses').delete().in('id', chunk);
+      if (error) throw error;
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!session?.user?.id) return;
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const ok = window.confirm(`Delete ${ids.length} selected license(s)? This cannot be undone.`);
+    if (!ok) return;
+    try {
+      await deleteByIds(ids);
+      setLicenses((prev) => prev.filter((l) => !selectedIds.has(l.id)));
+      setSelectedIds(new Set());
+      show('Selected licenses deleted', 'success');
+    } catch (e) {
+      console.error('Error deleting selected licenses:', e);
+      show('Failed to delete selected licenses', 'error');
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!session?.user?.id) return;
+    if (licenses.length === 0) return;
+    const phrase = window.prompt('Type DELETE to confirm deleting ALL licenses currently loaded in this list.');
+    if (phrase !== 'DELETE') return;
+    try {
+      const ids = licenses.map((l) => l.id);
+      await deleteByIds(ids);
+      setLicenses([]);
+      setSelectedIds(new Set());
+      show('All licenses deleted', 'success');
+    } catch (e) {
+      console.error('Error deleting all licenses:', e);
+      show('Failed to delete all licenses', 'error');
+    }
+  };
 
   useEffect(() => {
     fetchLicenses();
@@ -399,6 +474,28 @@ export default function Licenses() {
           </p>
         </div>
         <div className="mt-4 sm:mt-0 flex items-center gap-2">
+          <button
+            onClick={toggleSelectAll}
+            className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm bg-white text-gray-700 hover:bg-gray-50"
+            disabled={licenses.length === 0}
+          >
+            {allSelected ? 'Unselect All' : 'Select All'}
+          </button>
+          <button
+            onClick={handleDeleteSelected}
+            className="inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+            disabled={selectedIds.size === 0}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Selected ({selectedIds.size})
+          </button>
+          <button
+            onClick={handleDeleteAll}
+            className="inline-flex items-center justify-center px-3 py-2 border border-red-300 text-sm font-medium rounded-md shadow-sm bg-white text-red-700 hover:bg-red-50 disabled:opacity-50"
+            disabled={licenses.length === 0}
+          >
+            Delete All
+          </button>
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -604,6 +701,12 @@ export default function Licenses() {
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-3 mb-2">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-gray-300"
+                              checked={selectedIds.has(license.id)}
+                              onChange={() => toggleSelectOne(license.id)}
+                            />
                             <p className="text-sm font-medium text-blue-600 truncate font-mono">
                               {license.key}
                             </p>
