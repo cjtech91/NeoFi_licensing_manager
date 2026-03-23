@@ -1,0 +1,9 @@
+[Unit]
+Description=NeoFi Cloudflare Heartbeat
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/neofi/heartbeat.env
+ExecStart=/usr/local/bin/neofi-heartbeat.sh

@@ -1,0 +1,10 @@
+[Unit]
+Description=NeoFi Cloudflare Heartbeat Timer
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=60s
+Unit=neofi-heartbeat.service
+
+[Install]
+WantedBy=timers.target

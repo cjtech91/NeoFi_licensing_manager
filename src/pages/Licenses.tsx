@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Key, Plus, Copy, Check, RefreshCw, Loader2, ShieldCheck } from 'lucide-react';
@@ -13,6 +13,7 @@ interface License {
   machine_id: string | null;
   created_at: string;
   activated_at: string | null;
+  last_seen_at?: string | null;
 }
 
 interface Activation {
@@ -42,6 +43,7 @@ export default function Licenses() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activationSearch, setActivationSearch] = useState<string>('');
   const [activationModel, setActivationModel] = useState<string>('all');
+  const licensesRef = useRef<License[]>([]);
 
   const applyCloudflareStatus = async (rows: License[]) => {
     try {
@@ -58,6 +60,7 @@ export default function Licenses() {
         status?: unknown;
         bound_serial?: unknown;
         activated_at?: unknown;
+        machine_last_seen_at?: unknown;
       };
       const payload = (await res.json()) as { ok?: boolean; records?: Record<string, CloudflareLicenseRecord | null> };
       if (!payload || payload.ok !== true || !payload.records) return rows;
@@ -74,18 +77,49 @@ export default function Licenses() {
         const boundSerial = typeof rec.bound_serial === 'string' && rec.bound_serial.trim().length > 0 ? rec.bound_serial.trim() : null;
         const activatedAt =
           typeof rec.activated_at === 'number' && Number.isFinite(rec.activated_at) ? new Date(rec.activated_at).toISOString() : r.activated_at;
+        const lastSeenAt =
+          typeof rec.machine_last_seen_at === 'number' && Number.isFinite(rec.machine_last_seen_at)
+            ? new Date(rec.machine_last_seen_at).toISOString()
+            : r.last_seen_at ?? null;
 
         return {
           ...r,
           status: nextStatus ?? r.status,
           system_serial: boundSerial ?? r.system_serial,
           activated_at: activatedAt,
+          last_seen_at: lastSeenAt,
         };
       });
     } catch {
       return rows;
     }
   };
+
+  useEffect(() => {
+    licensesRef.current = licenses;
+  }, [licenses]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      const current = licensesRef.current;
+      if (current.length === 0) return;
+      const merged = await applyCloudflareStatus(current);
+      if (cancelled) return;
+      const changed = merged.some((m, i) => {
+        const o = current[i];
+        return m.status !== o.status || m.system_serial !== o.system_serial || m.activated_at !== o.activated_at;
+      });
+      if (changed) setLicenses(merged);
+    };
+
+    const id = window.setInterval(run, 15000);
+    window.setTimeout(run, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
 
   useEffect(() => {
     fetchLicenses();
@@ -578,6 +612,11 @@ export default function Licenses() {
                             <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
                               {license.type}
                             </span>
+                            {license.last_seen_at && Date.now() - new Date(license.last_seen_at).getTime() < 2 * 60 * 1000 && (
+                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                online
+                              </span>
+                            )}
                             <button
                               onClick={() => handleRevokeLicense(license.id)}
                               className="ml-2 px-2 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200"
@@ -605,6 +644,14 @@ export default function Licenses() {
                               <span>
                                 {license.activated_at 
                                   ? new Date(license.activated_at).toLocaleString() 
+                                  : 'N/A'}
+                              </span>
+                            </p>
+                            <p className="mt-1 flex items-center">
+                              <span className="font-medium mr-2">Last Seen:</span>
+                              <span>
+                                {license.last_seen_at
+                                  ? new Date(license.last_seen_at).toLocaleString()
                                   : 'N/A'}
                               </span>
                             </p>
