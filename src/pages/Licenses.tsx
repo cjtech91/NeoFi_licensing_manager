@@ -46,6 +46,17 @@ export default function Licenses() {
   const [activationModel, setActivationModel] = useState<string>('all');
   const licensesRef = useRef<License[]>([]);
 
+  const syncToD1 = async (rows: Array<{ key: string; status?: string; owner?: string | null; type?: string; expires_at?: number | null }>) => {
+    try {
+      if (rows.length === 0) return;
+      await fetch('/api/d1-license-upsert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ licenses: rows }),
+      });
+    } catch {}
+  };
+
   const applyCloudflareStatus = async (rows: License[]) => {
     try {
       const keys = Array.from(new Set(rows.map(r => (r.key || '').trim()).filter(Boolean)));
@@ -320,6 +331,10 @@ export default function Licenses() {
 
       if (error) throw error;
 
+      try {
+        await syncToD1((data || []).map((d: License) => ({ key: d.key, status: d.status, type: d.type })));
+      } catch {}
+
       setLicenses([...(data || []), ...licenses]);
       setShowModal(false);
     } catch (error: unknown) {
@@ -373,6 +388,9 @@ export default function Licenses() {
                 .select();
               
               if (!retryError) {
+                try {
+                  await syncToD1((retryData || []).map((d: License) => ({ key: d.key, status: d.status, type: d.type })));
+                } catch {}
                 setLicenses([...(retryData || []), ...licenses]);
                 setShowModal(false);
                 alert('License generated successfully! (User account link was fixed automatically)');

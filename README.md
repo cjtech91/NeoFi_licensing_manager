@@ -66,3 +66,13 @@ Verify:
 systemctl status neofi-heartbeat.timer
 journalctl -u neofi-heartbeat.service -n 50 --no-pager
 ```
+
+## D1 (always save generated licenses)
+
+If you want every generated license (from the web UI) to also be saved into Cloudflare D1, bind a D1 database to the Cloudflare Pages project:
+
+- Pages project → Settings → Functions → Bindings → D1 database
+- Variable name: `LICENSE_DB`
+- Apply schema from [cloudflare/license-worker/schema.sql](file:///c:/Users/CJTECH%20NADS/Documents/trae_projects/NeoFi_licensing_manager/cloudflare/license-worker/schema.sql)
+
+The web UI calls `/api/d1-license-upsert` after license generation.
