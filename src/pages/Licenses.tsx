@@ -43,6 +43,50 @@ export default function Licenses() {
   const [activationSearch, setActivationSearch] = useState<string>('');
   const [activationModel, setActivationModel] = useState<string>('all');
 
+  const applyCloudflareStatus = async (rows: License[]) => {
+    try {
+      const keys = Array.from(new Set(rows.map(r => r.key).filter(Boolean)));
+      if (keys.length === 0) return rows;
+
+      const res = await fetch('/api/license-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keys }),
+      });
+      if (!res.ok) return rows;
+      type CloudflareLicenseRecord = {
+        status?: unknown;
+        bound_serial?: unknown;
+        activated_at?: unknown;
+      };
+      const payload = (await res.json()) as { ok?: boolean; records?: Record<string, CloudflareLicenseRecord | null> };
+      if (!payload || payload.ok !== true || !payload.records) return rows;
+
+      const normalizeStatus = (s: unknown): License['status'] | null => {
+        if (s === 'active' || s === 'used' || s === 'revoked') return s;
+        return null;
+      };
+
+      return rows.map((r) => {
+        const rec = payload.records?.[r.key];
+        if (!rec) return r;
+        const nextStatus = normalizeStatus(rec.status);
+        const boundSerial = typeof rec.bound_serial === 'string' && rec.bound_serial.trim().length > 0 ? rec.bound_serial.trim() : null;
+        const activatedAt =
+          typeof rec.activated_at === 'number' && Number.isFinite(rec.activated_at) ? new Date(rec.activated_at).toISOString() : r.activated_at;
+
+        return {
+          ...r,
+          status: nextStatus ?? r.status,
+          system_serial: boundSerial ?? r.system_serial,
+          activated_at: activatedAt,
+        };
+      });
+    } catch {
+      return rows;
+    }
+  };
+
   useEffect(() => {
     fetchLicenses();
     fetchActivations();
@@ -78,7 +122,8 @@ export default function Licenses() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setLicenses(data || []);
+      const merged = await applyCloudflareStatus((data || []) as License[]);
+      setLicenses(merged);
     } catch (error) {
       console.error('Error fetching licenses:', error);
     } finally {
@@ -117,7 +162,8 @@ export default function Licenses() {
         .or(`key.ilike.%${q}%,system_serial.ilike.%${q}%`)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setLicenses(data || []);
+      const merged = await applyCloudflareStatus((data || []) as License[]);
+      setLicenses(merged);
     } catch (error) {
       console.error('Error searching licenses:', error);
       alert('Failed to search licenses');
