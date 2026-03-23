@@ -2,13 +2,9 @@ import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
-  LayoutDashboard, 
-  Ticket, 
   Wifi, 
-  BarChart3, 
   Key,
   ScrollText,
-  Cpu,
   LogOut, 
   Menu,
   X
@@ -16,7 +12,7 @@ import {
 import { cn } from '../lib/utils';
 
 export default function Layout() {
-  const { signOut, user } = useAuth();
+  const { signOut, session } = useAuth();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
@@ -26,13 +22,9 @@ export default function Layout() {
   };
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Vouchers', href: '/vouchers', icon: Ticket },
     { name: 'Machines', href: '/machines', icon: Wifi },
     { name: 'Licenses', href: '/licenses', icon: Key },
     { name: 'License Logs', href: '/license-logs', icon: ScrollText },
-    { name: 'Sub Vendo', href: '/sub-vendo', icon: Cpu },
-    { name: 'Reports', href: '/reports', icon: BarChart3 },
   ];
 
   return (
@@ -91,12 +83,12 @@ export default function Layout() {
             <div className="flex items-center mb-4">
               <div className="flex-shrink-0">
                 <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
-                  {user?.email?.[0].toUpperCase()}
+                  {(session?.email || 'A')[0].toUpperCase()}
                 </div>
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-700 truncate max-w-[150px]">
-                  {user?.email}
+                  {session?.email || 'admin'}
                 </p>
                 <p className="text-xs text-gray-500">Admin</p>
               </div>

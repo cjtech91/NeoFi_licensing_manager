@@ -1,4 +1,5 @@
 type Env = {
+  LICENSE_DB: D1Database;
   LICENSE_KV: KVNamespace;
 };
 
@@ -25,37 +26,43 @@ function json(data: unknown, status = 200) {
 }
 
 async function getRecord(env: Env, key: string): Promise<LicenseRecord | null> {
-  const k1 = `lic:${key}`;
-  const k2 = `license:${key}`;
-  const raw1 = await env.LICENSE_KV.get(k1);
-  if (raw1) {
-    const rec = JSON.parse(raw1) as LicenseRecord;
-    const serial = typeof rec.bound_serial === 'string' ? rec.bound_serial.trim() : '';
-    if (serial) {
-      const machineRaw = await env.LICENSE_KV.get(`machine:${serial}`);
-      if (machineRaw) {
-        const m = JSON.parse(machineRaw) as { last_seen_at?: unknown; device_model?: unknown };
-        if (typeof m.last_seen_at === 'number') rec.machine_last_seen_at = m.last_seen_at;
-        if (typeof m.device_model === 'string') rec.machine_device_model = m.device_model;
-      }
+  const row = await env.LICENSE_DB.prepare(
+    'SELECT status, bound_serial, activated_at, updated_at, owner, type, expires_at FROM licenses WHERE license_key = ? LIMIT 1'
+  )
+    .bind(key)
+    .first<{
+      status: string;
+      bound_serial: string | null;
+      activated_at: number | null;
+      updated_at: number | null;
+      owner: string | null;
+      type: string;
+      expires_at: number | null;
+    }>();
+
+  if (!row) return null;
+
+  const rec: LicenseRecord = {
+    status: row.status,
+    bound_serial: row.bound_serial,
+    activated_at: row.activated_at ?? undefined,
+    updated_at: row.updated_at ?? undefined,
+    owner: row.owner,
+    type: row.type,
+    expires_at: row.expires_at,
+  };
+
+  const serial = typeof rec.bound_serial === 'string' ? rec.bound_serial.trim() : '';
+  if (serial) {
+    const machineRaw = await env.LICENSE_KV.get(`machine:${serial}`);
+    if (machineRaw) {
+      const m = JSON.parse(machineRaw) as { last_seen_at?: unknown; device_model?: unknown };
+      if (typeof m.last_seen_at === 'number') rec.machine_last_seen_at = m.last_seen_at;
+      if (typeof m.device_model === 'string') rec.machine_device_model = m.device_model;
     }
-    return rec;
   }
-  const raw2 = await env.LICENSE_KV.get(k2);
-  if (raw2) {
-    const rec = JSON.parse(raw2) as LicenseRecord;
-    const serial = typeof rec.bound_serial === 'string' ? rec.bound_serial.trim() : '';
-    if (serial) {
-      const machineRaw = await env.LICENSE_KV.get(`machine:${serial}`);
-      if (machineRaw) {
-        const m = JSON.parse(machineRaw) as { last_seen_at?: unknown; device_model?: unknown };
-        if (typeof m.last_seen_at === 'number') rec.machine_last_seen_at = m.last_seen_at;
-        if (typeof m.device_model === 'string') rec.machine_device_model = m.device_model;
-      }
-    }
-    return rec;
-  }
-  return null;
+
+  return rec;
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {

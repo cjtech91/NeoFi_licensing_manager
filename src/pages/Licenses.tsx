@@ -1,104 +1,157 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Copy, Check, Loader2, Plus, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { Key, Plus, Copy, Check, RefreshCw, Loader2, ShieldCheck, Trash2 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
-interface License {
-  id: string;
+type LicenseRow = {
+  license_key: string;
+  status: string;
+  owner: string | null;
+  type: string;
+  expires_at: number | null;
+  bound_serial: string | null;
+  activated_at: number | null;
+  created_at: number | null;
+  updated_at: number | null;
+};
+
+type License = {
   key: string;
   status: 'active' | 'used' | 'revoked';
   type: 'lifetime' | 'subscription' | 'trial';
+  owner: string | null;
   system_serial: string | null;
-  machine_id: string | null;
-  created_at: string;
   activated_at: string | null;
-  last_seen_at?: string | null;
+  created_at: string;
+  last_seen_at: string | null;
+};
+
+type CloudflareStatusRecord = {
+  status?: unknown;
+  bound_serial?: unknown;
+  activated_at?: unknown;
+  machine_last_seen_at?: unknown;
+};
+
+function normalizeStatus(v: unknown): License['status'] {
+  const s = String(v || '').toLowerCase();
+  if (s === 'used') return 'used';
+  if (s === 'revoked') return 'revoked';
+  return 'active';
 }
 
-interface Activation {
-  id: string;
-  created_at: string;
-  license_id: string | null;
-  license_key: string | null;
-  system_serial: string | null;
-  device_model: string | null;
-  status: string | null;
-  activated_at: string | null;
-  message: string | null;
+function normalizeType(v: unknown): License['type'] {
+  const s = String(v || '').toLowerCase();
+  if (s === 'subscription') return 'subscription';
+  if (s === 'trial') return 'trial';
+  return 'lifetime';
+}
+
+function toIso(ms: number | null | undefined) {
+  if (!ms || !Number.isFinite(ms)) return null;
+  return new Date(ms).toISOString();
 }
 
 export default function Licenses() {
-  const { session } = useAuth();
+  const { getAuthHeader } = useAuth();
   const { show } = useToast();
   const [licenses, setLicenses] = useState<License[]>([]);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [activations, setActivations] = useState<Activation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingActivations, setLoadingActivations] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [newLicenseType, setNewLicenseType] = useState<'lifetime' | 'subscription' | 'trial'>('lifetime');
+  const [newLicenseType, setNewLicenseType] = useState<License['type']>('lifetime');
   const [newLicenseQty, setNewLicenseQty] = useState<number>(1);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activationSearch, setActivationSearch] = useState<string>('');
-  const [activationModel, setActivationModel] = useState<string>('all');
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const licensesRef = useRef<License[]>([]);
 
-  const syncToD1 = async (rows: Array<{ key: string; status?: string; owner?: string | null; type?: string; expires_at?: number | null }>) => {
+  const allSelected = licenses.length > 0 && selectedKeys.size === licenses.length;
+
+  const toggleSelectAll = () => {
+    if (allSelected) setSelectedKeys(new Set());
+    else setSelectedKeys(new Set(licenses.map((l) => l.key)));
+  };
+
+  const toggleSelectOne = (key: string) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const fetchLicenses = async (q?: string) => {
     try {
-      if (rows.length === 0) return;
-      await fetch('/api/d1-license-upsert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ licenses: rows }),
-      });
-    } catch {}
+      setLoading(true);
+      const url = new URL('/api/licenses-list', window.location.origin);
+      if (q) url.searchParams.set('q', q);
+      const res = await fetch(url.toString(), { headers: { ...getAuthHeader() } });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; licenses?: LicenseRow[] };
+      if (!res.ok || data.ok !== true) throw new Error('Failed to load licenses');
+      const rows = (data.licenses || []).map((r) => ({
+        key: r.license_key,
+        status: normalizeStatus(r.status),
+        type: normalizeType(r.type),
+        owner: r.owner ?? null,
+        system_serial: r.bound_serial ?? null,
+        activated_at: toIso(r.activated_at),
+        created_at: toIso(r.created_at) || new Date().toISOString(),
+        last_seen_at: null,
+      })) as License[];
+      const merged = await applyCloudflareStatus(rows);
+      setLicenses(merged);
+    } catch {
+      setLicenses([]);
+      show('Failed to load licenses', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const applyCloudflareStatus = async (rows: License[]) => {
     try {
-      const keys = Array.from(new Set(rows.map(r => (r.key || '').trim()).filter(Boolean)));
+      const keys = Array.from(new Set(rows.map((r) => (r.key || '').trim()).filter(Boolean)));
       if (keys.length === 0) return rows;
-
       const res = await fetch('/api/license-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ keys }),
       });
       if (!res.ok) return rows;
-      type CloudflareLicenseRecord = {
-        status?: unknown;
-        bound_serial?: unknown;
-        activated_at?: unknown;
-        machine_last_seen_at?: unknown;
-      };
-      const payload = (await res.json()) as { ok?: boolean; records?: Record<string, CloudflareLicenseRecord | null> };
-      if (!payload || payload.ok !== true || !payload.records) return rows;
+      const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; records?: unknown };
+      const rawRecords =
+        payload && payload.ok === true && payload.records && typeof payload.records === 'object' && !Array.isArray(payload.records)
+          ? (payload.records as Record<string, unknown>)
+          : {};
 
-      const normalizeStatus = (s: unknown): License['status'] | null => {
-        if (s === 'active' || s === 'used' || s === 'revoked') return s;
-        return null;
-      };
+      const records: Record<string, CloudflareStatusRecord | null> = {};
+      for (const [k, v] of Object.entries(rawRecords)) {
+        if (v && typeof v === 'object' && !Array.isArray(v)) {
+          const obj = v as Record<string, unknown>;
+          if ('record' in obj) {
+            const inner = obj.record;
+            records[k] = inner && typeof inner === 'object' && !Array.isArray(inner) ? (inner as CloudflareStatusRecord) : inner === null ? null : null;
+          } else {
+            records[k] = obj as CloudflareStatusRecord;
+          }
+        } else {
+          records[k] = v === null ? null : null;
+        }
+      }
 
       return rows.map((r) => {
         const k = (r.key || '').trim();
-        const rec = payload.records?.[k] ?? payload.records?.[r.key];
+        const rec = records[k];
         if (!rec) return r;
-        const nextStatus = normalizeStatus(rec.status);
-        const boundSerial = typeof rec.bound_serial === 'string' && rec.bound_serial.trim().length > 0 ? rec.bound_serial.trim() : null;
-        const activatedAt =
-          typeof rec.activated_at === 'number' && Number.isFinite(rec.activated_at) ? new Date(rec.activated_at).toISOString() : r.activated_at;
-        const lastSeenAt =
-          typeof rec.machine_last_seen_at === 'number' && Number.isFinite(rec.machine_last_seen_at)
-            ? new Date(rec.machine_last_seen_at).toISOString()
-            : r.last_seen_at ?? null;
-
+        const boundSerial = typeof rec.bound_serial === 'string' && rec.bound_serial.trim() ? rec.bound_serial.trim() : r.system_serial;
+        const activatedAt = typeof rec.activated_at === 'number' ? toIso(rec.activated_at) : r.activated_at;
+        const lastSeenAt = typeof rec.machine_last_seen_at === 'number' ? toIso(rec.machine_last_seen_at) : r.last_seen_at;
         return {
           ...r,
-          status: nextStatus ?? r.status,
-          system_serial: boundSerial ?? r.system_serial,
+          status: normalizeStatus(rec.status ?? r.status),
+          system_serial: boundSerial,
           activated_at: activatedAt,
           last_seen_at: lastSeenAt,
         };
@@ -109,19 +162,12 @@ export default function Licenses() {
   };
 
   useEffect(() => {
-    licensesRef.current = licenses;
-  }, [licenses]);
+    fetchLicenses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
-    setSelectedIds((prev) => {
-      if (prev.size === 0) return prev;
-      const keep = new Set(licenses.map((l) => l.id));
-      const next = new Set<string>();
-      prev.forEach((id) => {
-        if (keep.has(id)) next.add(id);
-      });
-      return next.size === prev.size ? prev : next;
-    });
+    licensesRef.current = licenses;
   }, [licenses]);
 
   useEffect(() => {
@@ -133,11 +179,10 @@ export default function Licenses() {
       if (cancelled) return;
       const changed = merged.some((m, i) => {
         const o = current[i];
-        return m.status !== o.status || m.system_serial !== o.system_serial || m.activated_at !== o.activated_at;
+        return m.status !== o.status || m.system_serial !== o.system_serial || m.activated_at !== o.activated_at || m.last_seen_at !== o.last_seen_at;
       });
       if (changed) setLicenses(merged);
     };
-
     const id = window.setInterval(run, 15000);
     window.setTimeout(run, 2000);
     return () => {
@@ -146,352 +191,155 @@ export default function Licenses() {
     };
   }, []);
 
-  const allSelected = licenses.length > 0 && selectedIds.size === licenses.length;
-
-  const toggleSelectAll = () => {
-    if (allSelected) {
-      setSelectedIds(new Set());
-      return;
-    }
-    setSelectedIds(new Set(licenses.map((l) => l.id)));
-  };
-
-  const toggleSelectOne = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const deleteByIds = async (ids: string[]) => {
-    const chunkSize = 100;
-    for (let i = 0; i < ids.length; i += chunkSize) {
-      const chunk = ids.slice(i, i + chunkSize);
-      const { error } = await supabase.from('licenses').delete().in('id', chunk);
-      if (error) throw error;
-    }
-  };
-
-  const handleDeleteSelected = async () => {
-    if (!session?.user?.id) return;
-    const ids = Array.from(selectedIds);
-    if (ids.length === 0) return;
-    const ok = window.confirm(`Delete ${ids.length} selected license(s)? This cannot be undone.`);
-    if (!ok) return;
-    try {
-      await deleteByIds(ids);
-      setLicenses((prev) => prev.filter((l) => !selectedIds.has(l.id)));
-      setSelectedIds(new Set());
-      show('Selected licenses deleted', 'success');
-    } catch (e) {
-      console.error('Error deleting selected licenses:', e);
-      show('Failed to delete selected licenses', 'error');
-    }
-  };
-
-  const handleDeleteAll = async () => {
-    if (!session?.user?.id) return;
-    if (licenses.length === 0) return;
-    const phrase = window.prompt('Type DELETE to confirm deleting ALL licenses currently loaded in this list.');
-    if (phrase !== 'DELETE') return;
-    try {
-      const ids = licenses.map((l) => l.id);
-      await deleteByIds(ids);
-      setLicenses([]);
-      setSelectedIds(new Set());
-      show('All licenses deleted', 'success');
-    } catch (e) {
-      console.error('Error deleting all licenses:', e);
-      show('Failed to delete all licenses', 'error');
-    }
-  };
-
-  useEffect(() => {
-    fetchLicenses();
-    fetchActivations();
-    const channel = supabase
-      .channel('licenses-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'licenses' },
-        () => {
-          fetchLicenses();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'activations' },
-        () => {
-          fetchActivations();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [session]);
-
-  const fetchLicenses = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('licenses')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      const merged = await applyCloudflareStatus((data || []) as License[]);
-      setLicenses(merged);
-    } catch (error) {
-      console.error('Error fetching licenses:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchActivations = async () => {
-    try {
-      setLoadingActivations(true);
-      const { data, error } = await supabase
-        .from('activations')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-      if (error) throw error;
-      setActivations(data || []);
-    } catch (error) {
-      console.error('Error fetching activations:', error);
-    } finally {
-      setLoadingActivations(false);
-    }
-  };
-
-  const handleSearchLicenses = async () => {
-    try {
-      setLoading(true);
-      const q = searchQuery.trim();
-      if (!q) {
-        await fetchLicenses();
-        return;
-      }
-      const { data, error } = await supabase
-        .from('licenses')
-        .select('*')
-        .or(`key.ilike.%${q}%,system_serial.ilike.%${q}%`)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      const merged = await applyCloudflareStatus((data || []) as License[]);
-      setLicenses(merged);
-    } catch (error) {
-      console.error('Error searching licenses:', error);
-      alert('Failed to search licenses');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const clearSearchLicenses = async () => {
-    setSearchQuery('');
-    await fetchLicenses();
-  };
-
-  const generateLicenseKey = () => {
-    // Format: NEO-XXXX-XXXX-XXXX
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const segment = () => {
-      let str = '';
-      for (let i = 0; i < 4; i++) {
-        str += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      return str;
-    };
-    return `NEO-${segment()}-${segment()}-${segment()}`;
-  };
-
-  const handleGenerateLicense = async () => {
+  const handleGenerate = async () => {
     try {
       setGenerating(true);
-      if (!session?.user?.id) {
-        alert('Please sign in to generate a license.');
-        return;
-      }
-      const qty = Math.max(1, Math.min(100, Number.isFinite(newLicenseQty) ? Math.floor(newLicenseQty) : 1));
-      const items = Array.from({ length: qty }, () => ({
-        key: generateLicenseKey(),
-        type: newLicenseType,
-        status: 'active',
-      }));
-      const { data, error } = await (supabase
-        .from('licenses') as any)
-        .insert(items)
-        .select();
-
-      if (error) throw error;
-
-      try {
-        await syncToD1((data || []).map((d: License) => ({ key: d.key, status: d.status, type: d.type })));
-      } catch {}
-
-      setLicenses([...(data || []), ...licenses]);
+      const qty = Math.max(1, Math.min(200, Number.isFinite(newLicenseQty) ? Math.floor(newLicenseQty) : 1));
+      const res = await fetch('/api/licenses-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        body: JSON.stringify({ qty, type: newLicenseType }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; licenses?: LicenseRow[]; error?: string };
+      if (!res.ok || data.ok !== true) throw new Error(data.error || 'Failed to generate');
+      const created = (data.licenses || []).map((r) => ({
+        key: r.license_key,
+        status: normalizeStatus(r.status),
+        type: normalizeType(r.type),
+        owner: r.owner ?? null,
+        system_serial: r.bound_serial ?? null,
+        activated_at: toIso(r.activated_at),
+        created_at: toIso(r.created_at) || new Date().toISOString(),
+        last_seen_at: null,
+      })) as License[];
+      const merged = await applyCloudflareStatus(created);
+      setLicenses((prev) => [...merged, ...prev]);
       setShowModal(false);
-    } catch (error: unknown) {
-      console.error('Error generating license:', error);
-      let errorMessage = 'Unknown error';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === 'object' && error !== null && 'message' in error) {
-        const maybeMsg = error as { message?: string };
-        if (typeof maybeMsg.message === 'string') {
-          errorMessage = maybeMsg.message;
-        }
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      } else {
-         // Fallback for completely unknown errors
-         try {
-            errorMessage = JSON.stringify(error);
-         } catch {
-            errorMessage = 'Unknown error object';
-         }
-      }
-
-      // Check for foreign key violation (missing user in public.users)
-      const maybeCode = (typeof error === 'object' && error !== null && 'code' in (error as Record<string, unknown>))
-        ? (error as { code?: string }).code
-        : undefined;
-      if (errorMessage.includes('licenses_created_by_fkey') || maybeCode === '23503') {
-        
-        try {
-          // Attempt to self-heal: create the missing user record
-          const { error: healError } = await (supabase
-            .from('users') as any)
-            .insert({
-              id: session?.user.id as string,
-              email: session?.user.email as string,
-              role: 'operator',
-              password_hash: 'managed_by_supabase_auth'
-            });
-
-          if (!healError) {
-             // Retry generation once
-             const retryItems = [{
-               key: generateLicenseKey(),
-               type: newLicenseType,
-               status: 'active'
-             }];
-             const { data: retryData, error: retryError } = await (supabase
-                .from('licenses') as any)
-                 .insert(retryItems)
-                .select();
-              
-              if (!retryError) {
-                try {
-                  await syncToD1((retryData || []).map((d: License) => ({ key: d.key, status: d.status, type: d.type })));
-                } catch {}
-                setLicenses([...(retryData || []), ...licenses]);
-                setShowModal(false);
-                alert('License generated successfully! (User account link was fixed automatically)');
-                return;
-              }
-          }
-        } catch (e) {
-          console.error('Self-healing failed:', e);
-        }
-      }
-
-      alert(`Failed to generate license: ${errorMessage}`);
+      show('License(s) generated', 'success');
+    } catch {
+      show('Failed to generate licenses', 'error');
     } finally {
       setGenerating(false);
     }
   };
 
-  const handleRevokeLicense = async (licenseId: string) => {
+  const handleSearch = async () => {
+    await fetchLicenses(searchQuery.trim() || undefined);
+  };
+
+  const handleCopy = async (key: string) => {
     try {
-      if (!session?.user?.id) return;
-      const ok = window.confirm('Revoke this license? This will lock the device immediately.');
+      await navigator.clipboard.writeText(key);
+      setCopySuccess(key);
+      setTimeout(() => setCopySuccess(null), 1500);
+    } catch {
+      show('Copy failed', 'error');
+    }
+  };
+
+  const updateLicense = async (key: string, action: 'revoke' | 'unbind' | 'bind', systemSerial?: string) => {
+    const res = await fetch('/api/licenses-update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify({ key, action, system_serial: systemSerial }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    if (!res.ok || data.ok !== true) throw new Error(data.error || 'Failed');
+  };
+
+  const handleRevoke = async (key: string) => {
+    try {
+      const ok = window.confirm(`Revoke license ${key}?`);
       if (!ok) return;
-      const { data, error } = await (supabase
-        .from('licenses') as any)
-        .update({ status: 'revoked' })
-        .eq('id', licenseId)
-        .select()
-        .single();
-      if (error) throw error;
-      setLicenses(licenses.map(l => (l.id === licenseId ? data : l)));
-      show('License revoked successfully', 'success');
-    } catch (e) {
-      console.error('Error revoking license:', e);
+      await updateLicense(key, 'revoke');
+      setLicenses((prev) => prev.map((l) => (l.key === key ? { ...l, status: 'revoked' } : l)));
+      show('License revoked', 'success');
+    } catch {
       show('Failed to revoke license', 'error');
     }
   };
 
-  const copyToClipboard = (key: string) => {
-    navigator.clipboard.writeText(key);
-    setCopySuccess(key);
-    setTimeout(() => setCopySuccess(null), 2000);
-  };
-  
-  const handleBindHardware = async (licenseId: string) => {
+  const handleUnbind = async (key: string) => {
     try {
-      if (!session?.user?.id) return;
-      const systemSerial = window.prompt('Enter System Serial to bind');
-      if (!systemSerial) return;
-      const { data, error } = await (supabase
-        .from('licenses') as any)
-        .update({ system_serial: systemSerial })
-        .eq('id', licenseId)
-        .select()
-        .single();
-      if (error) throw error;
-      setLicenses(licenses.map(l => (l.id === licenseId ? data : l)));
-      alert('License bound to System Serial successfully');
-    } catch (e) {
-      console.error('Error binding System Serial:', e);
-      alert('Failed to bind System Serial');
-    }
-  };
-  
-  const handleUnbindHardware = async (licenseId: string) => {
-    try {
-      if (!session?.user?.id) return;
-      const lic = licenses.find(l => l.id === licenseId);
-      const isRevoked = lic?.status === 'revoked';
-      const ok = window.confirm(isRevoked 
-        ? 'This license is revoked. Unbind the serial so the key can be reused?' 
-        : 'Unbind this license from its System Serial?');
+      const ok = window.confirm(`Unbind serial for ${key}?`);
       if (!ok) return;
-      if (isRevoked) {
-        const ok2 = window.confirm('Are you sure? The license will remain revoked, only the serial is removed.');
-        if (!ok2) return;
-      }
-      const { data, error } = await (supabase
-        .from('licenses') as any)
-        .update({ system_serial: null, activated_at: null, machine_id: null, status: 'active' })
-        .eq('id', licenseId)
-        .select()
-        .single();
-      if (error) throw error;
-      setLicenses(licenses.map(l => (l.id === licenseId ? data : l)));
-      show('Serial unbound. License is reusable.', 'success');
-    } catch (e) {
-      console.error('Error unbinding System Serial:', e);
-      show('Failed to unbind System Serial', 'error');
+      await updateLicense(key, 'unbind');
+      setLicenses((prev) => prev.map((l) => (l.key === key ? { ...l, status: 'active', system_serial: null, activated_at: null } : l)));
+      show('License unbound', 'success');
+    } catch {
+      show('Failed to unbind', 'error');
     }
   };
+
+  const handleBind = async (key: string) => {
+    try {
+      const serial = window.prompt('Enter System Serial to bind:');
+      if (!serial) return;
+      await updateLicense(key, 'bind', serial);
+      setLicenses((prev) =>
+        prev.map((l) => (l.key === key ? { ...l, status: 'used', system_serial: serial, activated_at: l.activated_at || new Date().toISOString() } : l))
+      );
+      show('Serial bound', 'success');
+    } catch {
+      show('Failed to bind serial', 'error');
+    }
+  };
+
+  const deleteKeys = async (keys: string[]) => {
+    const res = await fetch('/api/licenses-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+      body: JSON.stringify({ keys }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    if (!res.ok || data.ok !== true) throw new Error(data.error || 'Failed');
+  };
+
+  const handleDeleteSelected = async () => {
+    const keys = Array.from(selectedKeys);
+    if (keys.length === 0) return;
+    const ok = window.confirm(`Delete ${keys.length} selected license(s)? This cannot be undone.`);
+    if (!ok) return;
+    try {
+      await deleteKeys(keys);
+      setLicenses((prev) => prev.filter((l) => !selectedKeys.has(l.key)));
+      setSelectedKeys(new Set());
+      show('Selected licenses deleted', 'success');
+    } catch {
+      show('Failed to delete selected licenses', 'error');
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (licenses.length === 0) return;
+    const phrase = window.prompt('Type DELETE to confirm deleting ALL licenses currently loaded in this list.');
+    if (phrase !== 'DELETE') return;
+    try {
+      await deleteKeys(licenses.map((l) => l.key));
+      setLicenses([]);
+      setSelectedKeys(new Set());
+      show('All licenses deleted', 'success');
+    } catch {
+      show('Failed to delete all licenses', 'error');
+    }
+  };
+
+  const activeBound = useMemo(() => licenses.filter((l) => (l.system_serial !== null || l.status === 'used') && l.status !== 'revoked'), [licenses]);
+  const unusedOrRevoked = useMemo(() => licenses.filter((l) => ((l.status === 'active' && !l.system_serial) || l.status === 'revoked')), [licenses]);
 
   return (
     <div className="space-y-6">
       <div className="sm:flex sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">License Management</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Generate and manage software licenses for your machines.
-          </p>
-        </div>
+        <h1 className="text-2xl font-bold text-gray-900">Licenses</h1>
         <div className="mt-4 sm:mt-0 flex items-center gap-2">
+          <button
+            onClick={() => fetchLicenses(searchQuery.trim() || undefined)}
+            className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm bg-white text-gray-700 hover:bg-gray-50"
+            disabled={loading}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </button>
           <button
             onClick={toggleSelectAll}
             className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm bg-white text-gray-700 hover:bg-gray-50"
@@ -502,10 +350,10 @@ export default function Licenses() {
           <button
             onClick={handleDeleteSelected}
             className="inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
-            disabled={selectedIds.size === 0}
+            disabled={selectedKeys.size === 0}
           >
             <Trash2 className="h-4 w-4 mr-2" />
-            Delete Selected ({selectedIds.size})
+            Delete Selected ({selectedKeys.size})
           </button>
           <button
             onClick={handleDeleteAll}
@@ -521,454 +369,201 @@ export default function Licenses() {
             className="inline-flex px-3 py-2 border border-gray-300 text-sm rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
           <button
-            onClick={handleSearchLicenses}
-            className="inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            onClick={handleSearch}
+            className="inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+            disabled={loading}
           >
             Search
           </button>
           <button
-            onClick={clearSearchLicenses}
-            className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            Clear
-          </button>
-          <button
             onClick={() => setShowModal(true)}
-            className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Generate License
+            Generate
           </button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Key className="h-6 w-6 text-gray-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Total Licenses</dt>
-                  <dd className="text-lg font-medium text-gray-900">{licenses.length}</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <ShieldCheck className="h-6 w-6 text-green-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Active (Bound)</dt>
-                  <dd className="text-lg font-medium text-gray-900">
-                    {licenses.filter(l => l.system_serial !== null || l.status === 'used').length}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <RefreshCw className="h-6 w-6 text-blue-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Unused Licenses</dt>
-                  <dd className="text-lg font-medium text-gray-900">
-                    {licenses.filter(l => l.status === 'active' && !l.system_serial).length}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Licenses Tables */}
       {loading ? (
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-          <div className="p-12 flex justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-          </div>
+        <div className="flex justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
       ) : (
-        <div className="space-y-8">
-          {/* Unused / Revoked Licenses */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div className="bg-white shadow overflow-hidden sm:rounded-lg">
             <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
               <h3 className="text-lg leading-6 font-medium text-gray-900">Unused / Revoked Licenses</h3>
             </div>
-            {licenses.filter(l => (l.status === 'active' && !l.system_serial) || l.status === 'revoked').length === 0 ? (
-              <div className="p-12 text-center text-gray-500">
-                No unused / revoked licenses found. Generate one to get started.
-              </div>
-            ) : (
-              <div className="h-96 overflow-y-auto">
-                <ul className="divide-y divide-gray-200">
-                  {licenses
-                    .filter(l => (l.status === 'active' && !l.system_serial) || l.status === 'revoked')
-                    .map((license) => (
-                    <li key={license.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-3">
-                            <p className="text-sm font-medium text-blue-600 truncate font-mono">
-                              {license.key}
-                            </p>
-                            <button
-                              onClick={() => copyToClipboard(license.key)}
-                              className="text-gray-400 hover:text-gray-600 transition-colors"
-                              title="Copy to clipboard"
-                            >
-                              {copySuccess === license.key ? (
-                                <Check className="h-4 w-4 text-green-500" />
-                              ) : (
-                                <Copy className="h-4 w-4" />
-                              )}
-                            </button>
-                            <span
-                              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                license.status === 'revoked'
-                                  ? 'bg-red-100 text-red-800'
-                                  : (!license.system_serial && license.status === 'active')
-                                    ? 'bg-green-100 text-green-800'
-                                    : license.status === 'used'
-                                      ? 'bg-blue-100 text-blue-800'
-                                      : 'bg-gray-100 text-gray-800'
-                              }`}
-                            >
-                              {!license.system_serial && license.status === 'active' ? 'unused' : license.status}
-                            </span>
-                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                              {license.type}
-                            </span>
-                            {license.status !== 'revoked' && (
-                              <button
-                                onClick={() => handleBindHardware(license.id)}
-                                className="ml-2 px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
-                              >
-                                Bind Serial
-                              </button>
-                            )}
-                            {license.status !== 'revoked' && license.system_serial && (
-                              <button
-                                onClick={() => handleUnbindHardware(license.id)}
-                                className="ml-2 px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
-                              >
-                                Unbind Serial
-                              </button>
-                            )}
-                            {license.status === 'revoked' && (
-                              <button
-                                onClick={() => handleUnbindHardware(license.id)}
-                                className="ml-2 px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
-                              >
-                                Unbind Serial
-                              </button>
-                            )}
-                          </div>
-                          <div className="mt-2 flex">
-                            <div className="flex items-center text-sm text-gray-500">
-                              <span className="truncate">
-                                {license.system_serial ? `Bound to: ${license.system_serial}` : 'Not activated yet'}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end text-sm text-gray-500">
-                          <span>Created: {new Date(license.created_at).toLocaleDateString()}</span>
-                          {license.activated_at && (
-                            <span className="text-xs text-gray-400">
-                              Activated: {new Date(license.activated_at).toLocaleDateString()}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-
-          {/* Active Bound / Used Licenses */}
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-            <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-              <h3 className="text-lg leading-6 font-medium text-gray-900">Active Bound Licenses</h3>
-            </div>
-            {licenses.filter(l => (l.system_serial !== null || l.status === 'used') && l.status !== 'revoked').length === 0 ? (
-              <div className="p-12 text-center text-gray-500">
-                No active bound licenses found.
-              </div>
-            ) : (
-              <div className="h-96 overflow-y-auto">
-                <ul className="divide-y divide-gray-200">
-                  {licenses.filter(l => (l.system_serial !== null || l.status === 'used') && l.status !== 'revoked').map((license) => (
-                    <li key={license.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4 rounded border-gray-300"
-                              checked={selectedIds.has(license.id)}
-                              onChange={() => toggleSelectOne(license.id)}
-                            />
-                            <p className="text-sm font-medium text-blue-600 truncate font-mono">
-                              {license.key}
-                            </p>
-                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                              {license.status}
-                            </span>
-                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                              {license.type}
-                            </span>
-                            {license.last_seen_at && Date.now() - new Date(license.last_seen_at).getTime() < 2 * 60 * 1000 && (
-                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                online
-                              </span>
-                            )}
-                            <button
-                              onClick={() => handleRevokeLicense(license.id)}
-                              className="ml-2 px-2 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200"
-                            >
-                              Revoke
-                            </button>
-                            {license.system_serial && (
-                              <button
-                                onClick={() => handleUnbindHardware(license.id)}
-                                className="ml-2 px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
-                              >
-                                Unbind Serial
-                              </button>
-                            )}
-                          </div>
-                          <div className="mt-2 text-sm text-gray-500">
-                            <p className="flex items-center">
-                              <span className="font-medium mr-2">System Serial:</span>
-                              <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">
-                                {license.system_serial || 'N/A'}
-                              </code>
-                            </p>
-                            <p className="mt-1 flex items-center">
-                              <span className="font-medium mr-2">Activated:</span>
-                              <span>
-                                {license.activated_at 
-                                  ? new Date(license.activated_at).toLocaleString() 
-                                  : 'N/A'}
-                              </span>
-                            </p>
-                            <p className="mt-1 flex items-center">
-                              <span className="font-medium mr-2">Last Seen:</span>
-                              <span>
-                                {license.last_seen_at
-                                  ? new Date(license.last_seen_at).toLocaleString()
-                                  : 'N/A'}
-                              </span>
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end text-sm text-gray-500">
-                          <span>Created: {new Date(license.created_at).toLocaleDateString()}</span>
-                          {license.machine_id && (
-                            <span className="text-xs text-gray-400 mt-1">
-                              Machine ID: {license.machine_id}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-          
-
-
-          {/* Recent Activations */}
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-            <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-              <h3 className="text-lg leading-6 font-medium text-gray-900">Recent Activations</h3>
-            </div>
-            <div className="px-4 py-4 sm:px-6 flex items-center gap-2">
-              <input
-                value={activationSearch}
-                onChange={(e) => setActivationSearch(e.target.value)}
-                placeholder="Search by key, serial, or model"
-                className="inline-flex px-3 py-2 border border-gray-300 text-sm rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              <select
-                value={activationModel}
-                onChange={(e) => setActivationModel(e.target.value)}
-                className="inline-flex px-3 py-2 border border-gray-300 text-sm rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="all">All models</option>
-                {[...new Set(activations.map(a => a.device_model).filter(Boolean))].map((m) => (
-                  <option key={m as string} value={m as string}>{m as string}</option>
+            <div className="h-[520px] overflow-y-auto">
+              <ul className="divide-y divide-gray-200">
+                {unusedOrRevoked.map((l) => (
+                  <li key={l.key} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-gray-300"
+                        checked={selectedKeys.has(l.key)}
+                        onChange={() => toggleSelectOne(l.key)}
+                      />
+                      <p className="text-sm font-medium text-blue-600 truncate font-mono">{l.key}</p>
+                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">{l.status}</span>
+                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">{l.type}</span>
+                      <button
+                        onClick={() => handleCopy(l.key)}
+                        className="ml-2 px-2 py-1 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      >
+                        {copySuccess === l.key ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      </button>
+                      <button
+                        onClick={() => handleBind(l.key)}
+                        className="ml-2 px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                      >
+                        Bind Serial
+                      </button>
+                      {l.status !== 'revoked' && (
+                        <button
+                          onClick={() => handleRevoke(l.key)}
+                          className="ml-2 px-2 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200"
+                        >
+                          Revoke
+                        </button>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      <span>Created: {new Date(l.created_at).toLocaleString()}</span>
+                    </div>
+                  </li>
                 ))}
-              </select>
-              <button
-                onClick={() => { setActivationSearch(''); setActivationModel('all'); }}
-                className="inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Clear
-              </button>
+                {unusedOrRevoked.length === 0 && <li className="px-4 py-10 text-center text-gray-500">No unused/revoked licenses</li>}
+              </ul>
             </div>
-            {loadingActivations ? (
-              <div className="p-12 flex justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-              </div>
-            ) : activations.length === 0 ? (
-              <div className="p-12 text-center text-gray-500">
-                No activations recorded yet.
-              </div>
-            ) : (
-              <div className="h-96 overflow-y-auto">
-                <ul className="divide-y divide-gray-200">
-                  {activations
-                    .filter((a) => {
-                      const q = activationSearch.trim().toLowerCase();
-                      const matchesQuery = !q || [
-                        a.license_key || '',
-                        a.system_serial || '',
-                        a.device_model || ''
-                      ].some(v => v.toLowerCase().includes(q));
-                      const matchesModel = activationModel === 'all' || (a.device_model || '') === activationModel;
-                      return matchesQuery && matchesModel;
-                    })
-                    .map((a) => (
-                    <li key={a.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <p className="text-sm font-medium text-blue-600 truncate font-mono">
-                              {a.license_key || 'N/A'}
-                            </p>
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              a.status === 'used' ? 'bg-blue-100 text-blue-800' :
-                              a.status === 'active' ? 'bg-green-100 text-green-800' :
-                              a.status === 'revoked' ? 'bg-red-100 text-red-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {a.status || 'unknown'}
-                            </span>
-                          </div>
-                          <div className="mt-1 text-sm text-gray-500">
-                            <p className="flex items-center">
-                              <span className="font-medium mr-2">System Serial:</span>
-                              <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">
-                                {a.system_serial || 'N/A'}
-                              </code>
-                            </p>
-                            <p className="mt-1 flex items-center">
-                              <span className="font-medium mr-2">Device Model:</span>
-                              <span>{a.device_model || 'N/A'}</span>
-                            </p>
-                            <p className="mt-1 flex items-center">
-                              <span className="font-medium mr-2">Activated:</span>
-                              <span>
-                                {a.activated_at 
-                                  ? new Date(a.activated_at).toLocaleString() 
-                                  : (a.created_at ? new Date(a.created_at).toLocaleString() : 'N/A')}
-                              </span>
-                            </p>
-                            {a.message && (
-                              <p className="mt-1 text-xs text-gray-400">{a.message}</p>
-                            )}
-                          </div>
+          </div>
+
+          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+            <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
+              <h3 className="text-lg leading-6 font-medium text-gray-900">Active (Bound)</h3>
+            </div>
+            <div className="h-[520px] overflow-y-auto">
+              <ul className="divide-y divide-gray-200">
+                {activeBound.map((l) => {
+                  const online = l.last_seen_at ? Date.now() - new Date(l.last_seen_at).getTime() < 2 * 60 * 1000 : false;
+                  return (
+                    <li key={l.key} className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300"
+                          checked={selectedKeys.has(l.key)}
+                          onChange={() => toggleSelectOne(l.key)}
+                        />
+                        <p className="text-sm font-medium text-blue-600 truncate font-mono">{l.key}</p>
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">{l.status}</span>
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">{l.type}</span>
+                        {online && (
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">online</span>
+                        )}
+                        <button
+                          onClick={() => handleCopy(l.key)}
+                          className="ml-2 px-2 py-1 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        >
+                          {copySuccess === l.key ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        </button>
+                        <button
+                          onClick={() => handleUnbind(l.key)}
+                          className="ml-2 px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+                        >
+                          Unbind
+                        </button>
+                        <button
+                          onClick={() => handleRevoke(l.key)}
+                          className="ml-2 px-2 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200"
+                        >
+                          Revoke
+                        </button>
+                      </div>
+                      <div className="mt-2 text-sm text-gray-500 space-y-1">
+                        <div className="flex items-center">
+                          <span className="font-medium mr-2">System Serial:</span>
+                          <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-mono text-xs">{l.system_serial || 'N/A'}</code>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="font-medium mr-2">Activated:</span>
+                          <span>{l.activated_at ? new Date(l.activated_at).toLocaleString() : 'N/A'}</span>
+                        </div>
+                        <div className="flex items-center">
+                          <span className="font-medium mr-2">Last Seen:</span>
+                          <span>{l.last_seen_at ? new Date(l.last_seen_at).toLocaleString() : 'N/A'}</span>
                         </div>
                       </div>
+                      <div className="mt-3 flex items-center text-xs text-gray-500">
+                        <ShieldCheck className="h-4 w-4 mr-2 text-green-600" />
+                        Verified by Cloudflare
+                      </div>
                     </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+                  );
+                })}
+                {activeBound.length === 0 && <li className="px-4 py-10 text-center text-gray-500">No active/bound licenses</li>}
+              </ul>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Generate Modal */}
       {showModal && (
-        <div className="fixed z-10 inset-0 overflow-y-auto">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
             <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 opacity-75" onClick={() => setShowModal(false)}></div>
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
             </div>
-
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
-            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
-              <div>
-                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
-                  <Key className="h-6 w-6 text-blue-600" />
-                </div>
-                <div className="mt-3 text-center sm:mt-5">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900">
-                    Generate New License
-                  </h3>
-                  <div className="mt-2">
-                    <p className="text-sm text-gray-500">
-                      Select the type of license you want to generate.
-                    </p>
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-700 text-left mb-1">
-                        License Type
-                      </label>
-                      <select
-                        value={newLicenseType}
-                        onChange={(e) => setNewLicenseType(e.target.value as 'lifetime' | 'subscription' | 'trial')}
-                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                      >
-                        <option value="lifetime">Lifetime</option>
-                        <option value="subscription">Subscription</option>
-                        <option value="trial">Trial</option>
-                      </select>
-                    </div>
+            <span className="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">
+              &#8203;
+            </span>
+            <div className="inline-block transform overflow-hidden rounded-lg bg-white text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:align-middle">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">Generate Licenses</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Type</label>
+                    <select
+                      value={newLicenseType}
+                      onChange={(e) => setNewLicenseType(e.target.value as License['type'])}
+                      className="mt-1 block w-full rounded-md border-gray-300 py-2 px-3 border shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                    >
+                      <option value="lifetime">lifetime</option>
+                      <option value="subscription">subscription</option>
+                      <option value="trial">trial</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Quantity</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={200}
+                      value={newLicenseQty}
+                      onChange={(e) => setNewLicenseQty(Number(e.target.value))}
+                      className="mt-1 block w-full rounded-md border-gray-300 py-2 px-3 border shadow-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+                    />
                   </div>
                 </div>
               </div>
-              <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3">
+              <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
                 <button
                   type="button"
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:col-start-2 sm:text-sm"
-                  onClick={handleGenerateLicense}
+                  onClick={handleGenerate}
                   disabled={generating}
+                  className="inline-flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
                 >
-                  {generating ? 'Generating...' : 'Generate'}
+                  {generating ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Generate'}
                 </button>
                 <button
                   type="button"
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:col-start-1 sm:text-sm"
                   onClick={() => setShowModal(false)}
+                  className="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                 >
                   Cancel
                 </button>
-              </div>
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 text-left mb-1">
-                  Quantity
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={newLicenseQty}
-                  onChange={(e) => setNewLicenseQty(parseInt(e.target.value || '1', 10))}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                />
-                <p className="mt-1 text-xs text-gray-500">Up to 100 at once.</p>
               </div>
             </div>
           </div>

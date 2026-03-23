@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import { Wifi, Loader2 } from 'lucide-react';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState('admin');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { signIn } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,15 +17,11 @@ export default function Login() {
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
+      await signIn(email, password);
       navigate('/dashboard');
-    } catch (err: any) {
-      setError(err.message || 'Failed to login');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : typeof err === 'string' ? err : 'Failed to login';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -110,23 +107,8 @@ export default function Login() {
             </div>
           </form>
 
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">
-                  New to NeoFi?
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-6 text-center">
-              <Link to="/signup" className="font-medium text-blue-600 hover:text-blue-500">
-                Create an account
-              </Link>
-            </div>
+          <div className="mt-6 text-center text-sm text-gray-500">
+            Use the admin password configured in Cloudflare Pages secrets.
           </div>
         </div>
       </div>

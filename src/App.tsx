@@ -3,13 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Home from './pages/Home';
 import Login from './pages/Login';
-import Signup from './pages/Signup';
-import Dashboard from './pages/Dashboard';
-import Vouchers from './pages/Vouchers';
 import Machines from './pages/Machines';
 import Licenses from './pages/Licenses';
-import SubVendo from './pages/SubVendo';
-import Reports from './pages/Reports';
 import LicenseLogs from './pages/LicenseLogs';
 import Layout from './components/Layout';
 import { ToastProvider } from './context/ToastContext';
@@ -41,20 +36,16 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
             
             <Route path="/*" element={
               <ProtectedRoute>
                 <Layout />
               </ProtectedRoute>
             }>
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="vouchers" element={<Vouchers />} />
+              <Route path="dashboard" element={<Navigate to="/licenses" replace />} />
               <Route path="machines" element={<Machines />} />
               <Route path="licenses" element={<Licenses />} />
               <Route path="license-logs" element={<LicenseLogs />} />
-              <Route path="sub-vendo" element={<SubVendo />} />
-              <Route path="reports" element={<Reports />} />
             </Route>
           </Routes>
         </ToastProvider>

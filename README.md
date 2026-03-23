@@ -1,31 +1,25 @@
 # Piso Wifi Management System
 
-A comprehensive web-based management system for Piso Wifi vending machines.
+A web-based licensing manager for NeoFi devices running on Cloudflare (Pages + Functions + D1 + KV).
 
 ## Features
 
-- **Admin Dashboard**: Real-time sales monitoring and machine status.
-- **Voucher Management**: Generate, list, and print wifi vouchers.
-- **Machine Monitoring**: Track online/offline status of your machines.
-- **Sales Reports**: View daily, weekly, and monthly revenue.
+- **Licenses**: Generate, bind/unbind, revoke, delete (Cloudflare D1).
+- **Machine Monitoring**: Online/last-seen via heartbeats (Cloudflare KV).
+- **License Logs**: View activation/validation/revocation logs (Cloudflare KV).
 
 ## Tech Stack
 
 - **Frontend**: React, Vite, Tailwind CSS
-- **Backend**: Supabase (Auth, Database, Realtime)
+- **Backend**: Cloudflare Pages Functions
+- **Storage**: Cloudflare D1 (licenses) + Cloudflare KV (heartbeats/logs)
 - **Deployment**: Cloudflare Pages
 
 ## Setup Instructions
 
 1. **Clone the repository**
 2. **Install dependencies**: `npm install`
-3. **Setup Environment Variables**:
-   Create a `.env` file with:
-   ```
-   VITE_SUPABASE_URL=your_supabase_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   ```
-4. **Run Development Server**: `npm run dev`
+3. **Run Development Server**: `npm run dev`
 
 ## Deployment
 
@@ -69,10 +63,22 @@ journalctl -u neofi-heartbeat.service -n 50 --no-pager
 
 ## D1 (always save generated licenses)
 
-If you want every generated license (from the web UI) to also be saved into Cloudflare D1, bind a D1 database to the Cloudflare Pages project:
+Bind a D1 database to the Cloudflare Pages project:
 
 - Pages project → Settings → Functions → Bindings → D1 database
 - Variable name: `LICENSE_DB`
 - Apply schema from [cloudflare/license-worker/schema.sql](file:///c:/Users/CJTECH%20NADS/Documents/trae_projects/NeoFi_licensing_manager/cloudflare/license-worker/schema.sql)
 
-The web UI calls `/api/d1-license-upsert` after license generation.
+The web UI uses D1 endpoints:
+
+- `GET /api/licenses-list`
+- `POST /api/licenses-generate`
+- `POST /api/licenses-update`
+- `POST /api/licenses-delete`
+
+## Admin auth (Cloudflare only)
+
+Set these Pages secrets:
+
+- `ADMIN_PASSWORD` (login password)
+- `ADMIN_TOKEN` (Bearer token used for API calls)
