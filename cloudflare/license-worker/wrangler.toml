@@ -1,0 +1,8 @@
+name = "neofi-license-worker"
+main = "src/index.js"
+compatibility_date = "2026-03-23"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "neofi_licenses"
+database_id = ""
