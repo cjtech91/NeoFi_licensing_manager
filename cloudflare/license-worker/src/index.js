@@ -6,7 +6,7 @@ function jsonResponse(data, status = 200, headers = {}) {
 }
 
 function requireAuth(request, env) {
-  const expected = env.API_TOKEN;
+  const expected = env.CF_API_TOKEN || env.API_TOKEN;
   if (!expected) return true;
   const auth = request.headers.get('Authorization') || '';
   const parts = auth.split(' ');
@@ -60,18 +60,35 @@ function nowTs() {
 
 async function getLicenseRow(env, key) {
   const r = await env.DB.prepare(
-    'SELECT license_key, status, owner, type, expires_at, bound_serial FROM licenses WHERE license_key = ? LIMIT 1'
+    'SELECT license_key, status, owner, type, expires_at, bound_serial, activated_at FROM licenses WHERE license_key = ? LIMIT 1'
   )
     .bind(key)
     .first();
   return r || null;
 }
 
-async function bindIfNeeded(env, key, systemSerial) {
+function normalizeStatus(s) {
+  const v = String(s || '').toLowerCase();
+  if (v === 'revoked') return 'revoked';
+  if (v === 'used') return 'used';
+  return 'active';
+}
+
+async function ensureSchema(env) {
   await env.DB.prepare(
-    "UPDATE licenses SET bound_serial = ?, updated_at = ? WHERE license_key = ? AND (bound_serial IS NULL OR bound_serial = '')"
+    "CREATE TABLE IF NOT EXISTS licenses (license_key TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'active', owner TEXT, type TEXT NOT NULL DEFAULT 'lifetime', expires_at INTEGER, bound_serial TEXT, activated_at INTEGER, created_at INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000), updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now') * 1000))"
+  ).run();
+  await env.DB.prepare(
+    'CREATE TABLE IF NOT EXISTS machines (system_serial TEXT PRIMARY KEY, device_model TEXT, last_seen_at INTEGER, metadata_json TEXT)'
+  ).run();
+}
+
+async function bindAndMarkUsed(env, key, systemSerial) {
+  const ts = nowTs();
+  await env.DB.prepare(
+    "UPDATE licenses SET status='used', bound_serial=COALESCE(NULLIF(bound_serial,''), ?), activated_at=COALESCE(activated_at, ?), updated_at=? WHERE license_key=?"
   )
-    .bind(systemSerial, nowTs(), key)
+    .bind(systemSerial, ts, ts, key)
     .run();
 }
 
@@ -93,6 +110,8 @@ function buildToken(row, systemSerial, deviceModel) {
 
 async function handleActivate(request, env) {
   if (!requireAuth(request, env)) return jsonResponse({ allowed: false, status: 'unauthorized' }, 401);
+  if (!env.DB) return jsonResponse({ allowed: false, status: 'db_not_bound' }, 500);
+  await ensureSchema(env);
   const body = await request.json().catch(() => ({}));
   const key = String(body.key || body.license_key || '').trim();
   const systemSerial = String(body.system_serial || body.System_Serial || body.hwid || body.serial || '').trim();
@@ -101,14 +120,15 @@ async function handleActivate(request, env) {
 
   const row = await getLicenseRow(env, key);
   if (!row) return jsonResponse({ allowed: false, status: 'not_found' }, 404);
-  if (String(row.status || '').toLowerCase() !== 'active') return jsonResponse({ allowed: false, status: 'revoked' }, 200);
+  const status = normalizeStatus(row.status);
+  if (status === 'revoked') return jsonResponse({ allowed: false, status: 'revoked' }, 200);
   if (isExpired(row)) return jsonResponse({ allowed: false, status: 'expired' }, 200);
 
   const bound = String(row.bound_serial || '').trim();
   if (bound && bound !== systemSerial) {
     return jsonResponse({ allowed: false, status: 'bind_failed', message: 'Key is bound to another device' }, 200);
   }
-  if (!bound) await bindIfNeeded(env, key, systemSerial);
+  if (status === 'active') await bindAndMarkUsed(env, key, systemSerial);
 
   const token = buildToken(row, systemSerial, deviceModel);
   const signature = await signToken(token, env);
@@ -117,6 +137,8 @@ async function handleActivate(request, env) {
 
 async function handleValidate(request, env) {
   if (!requireAuth(request, env)) return jsonResponse({ allowed: false, status: 'unauthorized' }, 401);
+  if (!env.DB) return jsonResponse({ allowed: false, status: 'db_not_bound' }, 500);
+  await ensureSchema(env);
   const body = await request.json().catch(() => ({}));
   const key = String(body.key || body.license_key || '').trim();
   const systemSerial = String(body.system_serial || body.System_Serial || body.hwid || body.serial || '').trim();
@@ -125,13 +147,15 @@ async function handleValidate(request, env) {
 
   const row = await getLicenseRow(env, key);
   if (!row) return jsonResponse({ allowed: false, status: 'not_found' }, 404);
-  if (String(row.status || '').toLowerCase() !== 'active') return jsonResponse({ allowed: false, status: 'revoked' }, 200);
+  const status = normalizeStatus(row.status);
+  if (status === 'revoked') return jsonResponse({ allowed: false, status: 'revoked' }, 200);
   if (isExpired(row)) return jsonResponse({ allowed: false, status: 'expired' }, 200);
 
   const bound = String(row.bound_serial || '').trim();
   if (bound && bound !== systemSerial) {
     return jsonResponse({ allowed: false, status: 'serial_mismatch', message: 'Device mismatch' }, 200);
   }
+  if (status === 'active') await bindAndMarkUsed(env, key, systemSerial);
 
   const token = buildToken(row, systemSerial, deviceModel);
   const signature = await signToken(token, env);
@@ -140,6 +164,8 @@ async function handleValidate(request, env) {
 
 async function handleHeartbeat(request, env) {
   if (!requireAuth(request, env)) return jsonResponse({ ok: false }, 401);
+  if (!env.DB) return jsonResponse({ ok: false }, 500);
+  await ensureSchema(env);
   const body = await request.json().catch(() => ({}));
   const systemSerial = String(body.system_serial || body.System_Serial || '').trim();
   if (!systemSerial) return jsonResponse({ ok: false }, 400);
